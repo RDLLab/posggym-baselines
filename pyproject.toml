@@ -1,0 +1,109 @@
+# Package ######################################################################
+
+[build-system]
+requires = ["setuptools >= 61.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "posggym_baselines"
+description = "Implementations of planning and reinforcement learning algorithms for POSGGym environments."
+readme = "README.md"
+requires-python = ">= 3.8"
+authors = [
+    { name = "Jonathon Schwartz", email = "jonathon.schwartz@anu.edu.au" },
+]
+license = { text = "MIT License" }
+keywords = [
+    "multiagent-systems",
+    "reinforcement-learning",
+    "planning",
+    "gymnasium",
+    "POSG",
+]
+classifiers = [
+    # change to `5 - Production/Stable` maybe one day
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    'Intended Audience :: Science/Research',
+    'Topic :: Scientific/Engineering :: Artificial Intelligence',
+]
+dependencies = [
+    "posggym >=0.4.0.dev1",
+    "numpy >=1.21.0",
+    "torch >=2.0.0",
+    "wandb >=0.15",
+    "tensorboard >=2.13.0",
+    "matplotlib >=3.7.1",
+    "pandas >=2.0.1",
+    "seaborn >=0.12.2",
+    "scipy >=1.10.0",
+]
+dynamic = ["version"]
+
+[project.urls]
+Homepage = "https://github.com/RDLLab/posggym-baselines"
+Repository = "https://github.com/RDLLab/posggym-baselines"
+
+[tool.setuptools.packages.find]
+include = ["posggym_baselines", "posggym_baselines.*"]
+
+[tool.setuptools.package-data]
+rcpd = ["py.typed"]
+
+# Linters and Test tools #######################################################
+[tool.ruff]
+# https://beta.ruff.rs/docs/settings/
+src = ["posggym_baselines", "tests"]
+extend-select = ["C4", "SIM", "TCH"]
+show-fixes = true
+# Same as Black.
+line-length = 88
+# Assume Python 3.8
+target-version = "py38"
+
+# Ignore `F401` (import violations) in all `__init__.py` files,
+[tool.ruff.per-file-ignores]
+"__init__.py" = ["F401", "E402"]
+
+[tool.ruff.mccabe]
+# Unlike Flake8, default to a complexity level of 10.
+max-complexity = 10
+
+[tool.ruff.isort]
+lines-after-imports = 2
+extra-standard-library = ["typing_extensions"]
+
+[tool.pyright]
+include = ["porl/**"]
+exclude = ["**/__pycache__"]
+strict = []
+
+typeCheckingMode = "basic"
+pythonVersion = "3.10"
+pythonPlatform = "All"
+typeshedPath = "typeshed"
+enableTypeIgnoreComments = true
+
+# This is required as the CI pre-commit does not download the module (i.e. numpy, pygame, box2d)
+#   Therefore, we have to ignore missing imports
+reportMissingImports = "none"
+# Some modules are missing type stubs, which is an issue when running pyright locally
+reportMissingTypeStubs = false
+# For warning and error, will raise an error when
+reportInvalidTypeVarUse = "none"
+
+# reportUnknownMemberType = "warning"  # -> raises 6035 warnings
+# reportUnknownParameterType = "warning"  # -> raises 1327 warnings
+# reportUnknownVariableType = "warning"  # -> raises 2585 warnings
+# reportUnknownArgumentType = "warning"  # -> raises 2104 warnings
+reportGeneralTypeIssues = "none"        # -> commented out raises 489 errors
+reportUntypedFunctionDecorator = "none" # -> pytest.mark.parameterize issues
+
+reportPrivateImportUsage = "none"
+reportPrivateUsage = "warning"
+reportUnboundVariable = "warning"
