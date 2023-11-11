@@ -3,7 +3,7 @@ import os
 import time
 from datetime import timedelta
 from multiprocessing.queues import Empty, Full
-from typing import TYPE_CHECKING, Dict, List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -16,6 +16,7 @@ import posggym_baselines.ppo.utils as ppo_utils
 from posggym_baselines.ppo.eval import run_eval_worker
 from posggym_baselines.ppo.worker import run_rollout_worker
 from posggym_baselines.utils import logger
+from posggym_baselines.ppo.network import PPOModel
 
 
 if TYPE_CHECKING:
@@ -463,7 +464,7 @@ class PPOLearner:
                     "optimizer": self.optimizers[policy_id].state_dict(),
                     "global_step": global_step,
                     "update": update,
-                    "config": self.config.asdict(),
+                    "config": self.config.aspickleable(),
                 },
                 os.path.join(
                     self.config.log_dir, f"checkpoint_{update}_{policy_id}.pt"
@@ -472,6 +473,45 @@ class PPOLearner:
 
     def close(self):
         self.writer.close()
+
+
+def load_policies(
+    config: "PPOConfig",
+    save_dir: str,
+    checkpoint: Optional[int] = None,
+    device: Optional[Union[str, torch.device]] = None,
+) -> Dict[str, PPOModel]:
+    """Load policies from checkpoint files.
+
+    If checkpoint is None, load the latest checkpoint.
+    """
+    all_files = os.listdir(save_dir)
+    checkpoint_files = [
+        f for f in all_files if f.startswith("checkpoint") and f.endswith(".pt")
+    ]
+    if not checkpoint_files:
+        raise ValueError(f"No checkpoint files found in {save_dir}")
+
+    if not checkpoint:
+        checkpoint_files = sorted(checkpoint_files)
+        checkpoint = int(checkpoint_files[-1].split("_")[1])
+
+    policy_checkpoint_files = {}
+    for f in checkpoint_files:
+        tokens = f.split("_")
+        if tokens[1] != str(checkpoint):
+            continue
+        policy_id = "_".join(tokens[2:-1] + tokens[-1].split(".")[:1])
+        policy_checkpoint_files[policy_id] = os.path.join(save_dir, f)
+
+    device = device or config.device
+    policies = config.load_policies(device=device)
+    for policy_id, policy in policies.items():
+        checkpoint_file = policy_checkpoint_files[policy_id]
+        checkpoint = torch.load(checkpoint_file, map_location=device)
+        assert checkpoint is not None
+        policy.load_state_dict(checkpoint["model"])
+    return policies
 
 
 def run_learner(

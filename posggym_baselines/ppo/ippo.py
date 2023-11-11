@@ -37,10 +37,10 @@ class IPPOConfig(PPOConfig):
             f"sp_{i}": PPOLSTMModel(
                 input_size=np.prod(self.obs_space.shape),
                 num_actions=self.act_space.n,
-                trunk_sizes=self.trunk_size,
+                trunk_sizes=self.trunk_sizes,
                 lstm_size=self.lstm_size,
                 lstm_layers=self.lstm_num_layers,
-                head_sizes=self.head_size,
+                head_sizes=self.head_sizes,
             ).to(device)
             for i in range(self.pop_size)
         }
@@ -48,10 +48,10 @@ class IPPOConfig(PPOConfig):
             policies["BR"] = PPOLSTMModel(
                 input_size=np.prod(self.obs_space.shape),
                 num_actions=self.act_space.n,
-                trunk_sizes=self.trunk_size,
+                trunk_sizes=self.trunk_sizes,
                 lstm_size=self.lstm_size,
                 lstm_layers=self.lstm_num_layers,
-                head_sizes=self.head_size,
+                head_sizes=self.head_sizes,
             ).to(device)
         return policies
 

@@ -15,7 +15,6 @@ from posggym_baselines.ppo.eval import EvalFn, run_all_pairwise_evaluation
 
 from posggym.vector import SyncVectorEnv
 from posggym.wrappers import RecordEpisodeStatistics, StackEnv
-from posggym.wrappers.record_video import capped_cubic_video_schedule, RecordVideo
 
 if TYPE_CHECKING:
     import gymnasium as gym
@@ -150,9 +149,9 @@ class PPOConfig:
     # Number of layers in the LSTM
     lstm_num_layers: int = 1
     # size of network trunk
-    trunk_size: List[int] = field(default_factory=lambda: [64])
+    trunk_sizes: List[int] = field(default_factory=lambda: [64])
     # size of network heads
-    head_size: List[int] = field(default_factory=lambda: [64])
+    head_sizes: List[int] = field(default_factory=lambda: [64])
 
     def __post_init__(self):
         """Post initialization."""
@@ -245,11 +244,6 @@ class PPOConfig:
             [self.env_creator_fn(self, i, worker_idx) for i in range(num_envs)]
         )
         env = RecordEpisodeStatistics(env)
-        # if self.capture_video:
-        #     env = RecordVideo(
-        #         env, self.video_dir, episode_trigger=capped_cubic_video_schedule
-        #     )
-
         env = StackEnv(env)
         return env
 
@@ -323,5 +317,13 @@ class PPOConfig:
         """The size of the policy ID encoding vector."""
         raise NotImplementedError
 
-    def asdict(self):
+    def asdict(self) -> Dict:
         return asdict(self)
+
+    def aspickleable(self) -> Dict:
+        """Get a pickleable version of the config."""
+        return {
+            k: v
+            for k, v in self.asdict().items()
+            if k not in ("env_creator_fn", "eval_fns")
+        }

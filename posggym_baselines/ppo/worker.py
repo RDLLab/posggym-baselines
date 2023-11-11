@@ -172,9 +172,7 @@ def run_rollout_worker(
             next_obs, reward, terminated, truncated, dones, infos = envs.step(
                 next_action.reshape(-1).cpu().numpy()
             )
-            dones = (terminated | truncated).reshape(
-                (config.num_envs, config.num_agents)
-            ) | dones.reshape(-1, 1)
+            agent_dones = terminated | truncated
 
             rewards_buf[step] = (
                 torch.tensor(reward)
@@ -187,13 +185,13 @@ def run_rollout_worker(
                 .to(config.worker_device)
             )
             next_done = (
-                torch.Tensor(dones)
+                torch.Tensor(agent_dones)
                 .reshape((config.num_envs, config.num_agents))
                 .to(config.worker_device)
             )
 
-            for env_idx, done in enumerate(dones[:, 0]):
-                if done:
+            for env_idx, env_done in enumerate(dones):
+                if env_done:
                     num_episodes += 1
                     # reset lstm state when episode ends
                     next_lstm_state[0][:, env_idx, :, :] = 0
