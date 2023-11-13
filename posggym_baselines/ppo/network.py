@@ -29,7 +29,7 @@ class PPOModel(nn.Module):
         """Get the value from the critic.
 
         B = batch_size
-        T = seq_len
+        M = num_lstm_layers
         L = lstm_size
 
         Arguments
@@ -38,7 +38,7 @@ class PPOModel(nn.Module):
             The input to the network. Shape=(B, input_size).
         lstm_state:
             The previous hidden state of the LSTM (may be None if actor is not an RNN).
-            If provided, Shape=(T, B, L).
+            If provided, Shape=(M, B, L).
         done:
             Whether the episode is done. Shape=(B,).
         action:
@@ -47,7 +47,7 @@ class PPOModel(nn.Module):
         Returns
         -------
         value:
-            The value of the state. Shape=(T, B,).
+            The value of the state. Shape=(B,).
 
         """
         raise NotImplementedError
@@ -67,7 +67,6 @@ class PPOModel(nn.Module):
         """Get action from the actor.
 
         B = batch_size
-        T = seq_len
         L = lstm_size
         M = num_lstm_layers
 
@@ -86,13 +85,13 @@ class PPOModel(nn.Module):
         Returns
         -------
         action:
-            The action. Shape=(T, B,).
+            The action. Shape=(B,).
         log_prob:
-            The log probability of the action. Shape=(T, B,).
+            The log probability of the action. Shape=(B,).
         entropy:
-            The entropy of the action distribution. Shape=(T, B,).
+            The entropy of the action distribution. Shape=(B,).
         lstm_state:
-            Optional, new state of the LSTM. Shape=(T, B, L).
+            Optional, new state of the LSTM. Shape=(M, B, L).
 
         """
         raise NotImplementedError
@@ -113,8 +112,8 @@ class PPOModel(nn.Module):
         """Get action from the actor and value from the critic.
 
         B = batch_size
-        T = seq_len
         L = lstm_size
+        M = num_lstm_layers
 
         Arguments
         ---------
@@ -122,7 +121,7 @@ class PPOModel(nn.Module):
             The input to the network. Shape (B, input_size).
         lstm_state:
             The previous hidden state of the LSTM (may be None if actor is not an RNN).
-            If provided, Shape=(T, B, L).
+            If provided, Shape=(M, B, L).
         done:
             Whether the episode is done. Shape=(B,).
         action:
@@ -131,15 +130,15 @@ class PPOModel(nn.Module):
         Returns
         -------
         action:
-            The action. Shape=(T, B,).
+            The action. Shape=(B,).
         log_prob:
-            The log probability of the action. Shape=(T, B,).
+            The log probability of the action. Shape=(B,).
         entropy:
-            The entropy of the action distribution. Shape=(T, B,).
+            The entropy of the action distribution. Shape=(B,).
         value:
-            The values from critic. Shape=(T, B,).
+            The values from critic. Shape=(B,).
         lstm_state:
-            Optional, new state of the LSTM. Shape=(T, B, L).
+            Optional, new state of the LSTM. Shape=(B, L).
 
         """
         raise NotImplementedError

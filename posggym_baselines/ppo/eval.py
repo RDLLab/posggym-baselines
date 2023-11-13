@@ -146,6 +146,7 @@ def run_pairwise_evaluation(
     for (policy_idx1, policy_id1), (policy_idx2, policy_id2) in product(
         enumerate(policy_ids1), enumerate(policy_ids2)
     ):
+        print(f"- Running evaluation for {policy_id1} vs {policy_id2}")
         policy1 = policies[0][policy_id1]
         policy2 = policies[1][policy_id2]
 

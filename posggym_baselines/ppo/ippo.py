@@ -86,11 +86,5 @@ class IPPOConfig(PPOConfig):
         return [f"sp_{i}" for i in range(self.pop_size)]
 
     @property
-    def policy_id_encoding_size(self) -> int:
-        return self.pop_size + int(self.include_BR)
-
-    def get_policy_id_encoding(self, policy_id: str) -> torch.tensor:
-        idx = self.pop_size if policy_id == "BR" else int(policy_id.split("_")[-1])
-        encoding = torch.zeros(self.policy_id_encoding_size)
-        encoding[idx] = 1.0
-        return encoding
+    def train_policies(self) -> List[str]:
+        return self.get_all_policy_ids()

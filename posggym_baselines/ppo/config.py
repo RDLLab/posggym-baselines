@@ -308,15 +308,6 @@ class PPOConfig:
         """Get the ID of the policy."""
         return self.get_policy_idx_to_id_mapping()[policy_idx]
 
-    def get_policy_id_encoding(self, policy_id: str) -> torch.tensor:
-        """Get the encoding of the policy ID."""
-        raise NotImplementedError
-
-    @property
-    def policy_id_encoding_size(self) -> int:
-        """The size of the policy ID encoding vector."""
-        raise NotImplementedError
-
     def asdict(self) -> Dict:
         return asdict(self)
 

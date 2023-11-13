@@ -138,7 +138,7 @@ def filter_policy_batches_by_partner_dist(
         exclude_policy_ids = [
             partner_id
             for partner_id in all_policy_ids
-            if partner_id not in dist or dist[partner_id] == 0.0
+            if dist.get(partner_id, 0.0) == 0.0
         ]
         filtered_policy_batches[policy_id] = filter_batch_by_partner(
             batch, exclude_policy_ids, config

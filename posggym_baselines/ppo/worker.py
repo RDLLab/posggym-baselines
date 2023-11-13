@@ -118,9 +118,9 @@ def run_rollout_worker(
             break
 
         # sync weights
-        assert len(policy_weights) == len(policies)
-        for policy_id, policy in policies.items():
-            policy.load_state_dict(policy_weights[policy_id])
+        assert len(policy_weights) == len(config.train_policies)
+        for policy_id, weights in policy_weights.items():
+            policies[policy_id].load_state_dict(weights)
 
         # delete reference to learner weights to free any shared CUDA memory reference
         del policy_weights

@@ -35,14 +35,14 @@ class PPOLearner:
             self.writer = logger.TensorBoardLogger(config)
 
         self.policies = config.load_policies(device=config.device)
-        for policy in self.policies.values():
-            policy.share_memory()
+        for policy_id in self.config.train_policies:
+            self.policies[policy_id].share_memory()
 
         self.optimizers = {
             policy_id: optim.Adam(
-                policy.parameters(), lr=config.learning_rate, eps=1e-5
+                self.policies[policy_id].parameters(), lr=config.learning_rate, eps=1e-5
             )
-            for policy_id, policy in self.policies.items()
+            for policy_id in self.config.train_policies
         }
 
     def train(
@@ -87,8 +87,8 @@ class PPOLearner:
 
             # current model state to share with workers
             policy_states = {
-                policy_id: policy.state_dict()
-                for policy_id, policy in self.policies.items()
+                policy_id: self.policies[policy_id].state_dict()
+                for policy_id in self.config.train_policies
             }
 
             experience_collection_start_time = time.time()
@@ -144,7 +144,7 @@ class PPOLearner:
 
             # log policy episode stats (logging in policy ID order)
             policy_returns = {}
-            for policy_id in self.config.get_all_policy_ids():
+            for policy_id in self.config.train_policies:
                 if policy_id not in combined_batch.get("policy_stats", {}):
                     continue
                 policy_stats = combined_batch["policy_stats"][policy_id]
@@ -244,10 +244,11 @@ class PPOLearner:
             )
 
         # update each policy
-        for policy_id, policy in self.policies.items():
-            if policy_id not in policy_batches:
+        for policy_id in self.config.train_policies:
+            if policy_id not in policy_batches or len(policy_batches[policy_id]) == 0:
                 # no experience collected for this policy
                 continue
+            policy = self.policies[policy_id]
             policy_batch = policy_batches[policy_id]
             batch_seq_len, num_seqs_in_batch = policy_batch["obs"].shape[:2]
             batch_size = num_seqs_in_batch * batch_seq_len
@@ -458,10 +459,14 @@ class PPOLearner:
 
     def save(self, global_step: int, update: int):
         for policy_id, policy in self.policies.items():
+            if policy_id in self.config.train_policies:
+                optimizer_state = self.optimizers[policy_id].state_dict()
+            else:
+                optimizer_state = None
             torch.save(
                 {
                     "model": policy.state_dict(),
-                    "optimizer": self.optimizers[policy_id].state_dict(),
+                    "optimizer": optimizer_state,
                     "global_step": global_step,
                     "update": update,
                     "config": self.config.aspickleable(),
