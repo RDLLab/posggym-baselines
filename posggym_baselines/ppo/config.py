@@ -293,7 +293,6 @@ class PPOConfig:
 
     def get_policy_idx_to_id_mapping(self) -> Dict[int, str]:
         """Get the mapping from policy index to policy ID."""
-        # TODO: think about caching this or making it a property
         return dict(enumerate(self.get_all_policy_ids()))
 
     def get_policy_id_to_idx_mapping(self) -> Dict[str, int]:

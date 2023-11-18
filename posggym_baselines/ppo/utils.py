@@ -36,19 +36,25 @@ def split_batch_by_policy(
         a batch key (e.g. "obs", "actions", "logprobs", etc.) to a tensor. Each tensor
         has shape like shape=(L, B_j, ...).
     """
-    # create tensor of partner policy ids for each sequence
-    assert config.num_agents == 2
-    # TODO: generalize to support more than 2 agents (?)
-    # would need partner idxs to have extra dimension, shape=(L, B, N, N-1)
-    partner_policy_idxs = torch.zeros_like(batch["policy_idxs"])
-    partner_policy_idxs[:, :, 0] = batch["policy_idxs"][:, :, 1]
-    partner_policy_idxs[:, :, 1] = batch["policy_idxs"][:, :, 0]
+    if config.num_agents == 1:
+        partner_policy_idxs = None
+    else:
+        # create tensor of partner policy ids for each sequence
+        # partner idxs to have extra dimension, shape=(L, B, N, N-1)
+        partner_policy_idxs = torch.zeros(
+            batch["policy_idxs"].shape + (config.num_agents - 1,)
+        ).long()
+        for i in range(config.num_agents):
+            partner_policy_idxs[:, :, i] = torch.index_select(
+                batch["policy_idxs"],
+                dim=2,
+                index=torch.tensor([j for j in range(config.num_agents) if j != i]),
+            )
 
     policy_batches = {}
     for policy_id in config.get_all_policy_ids():
         policy_idx = config.get_policy_idx(policy_id)
         b_idxs = batch["policy_idxs"][0, :, :] == policy_idx
-        # b_idxs = torch.any(batch["policy_idxs"][0, :, :] == policy_idx, dim=1)
         policy_batch = {}
         for k, b in batch.items():
             if k == "initial_lstm_states":
@@ -58,7 +64,10 @@ def split_batch_by_policy(
                 policy_batch[k] = b.get(policy_id, {})
             else:
                 policy_batch[k] = b[:, b_idxs]
-        policy_batch["partner_policy_idxs"] = partner_policy_idxs[:, b_idxs]
+        if partner_policy_idxs is not None:
+            policy_batch["partner_policy_idxs"] = partner_policy_idxs[:, b_idxs]
+        else:
+            policy_batch["partner_policy_idxs"] = None
         policy_batches[policy_id] = policy_batch
     return policy_batches
 
@@ -87,24 +96,36 @@ def filter_batch_by_partner(
         dictionary will be returned.
 
     """
-    assert config.num_agents == 2
+    if config.num_agents == 1:
+        return batch
     assert "partner_policy_idxs" in batch
-    keep_idxs = torch.ones_like(batch["partner_policy_idxs"])
-    for policy_id in exclude_policy_ids:
-        policy_idx = config.get_policy_idx(policy_id)
-        keep_idxs[batch["partner_policy_idxs"] == policy_idx] = 0
+    # keep_idxs = torch.ones_like(batch["policy_idxs"])
+    # for policy_id in exclude_policy_ids:
+    #     policy_idx = config.get_policy_idx(policy_id)
+    #     keep_idxs[batch["partner_policy_idxs"] == policy_idx] = 0
+    # b_idxs = keep_idxs[0] > 0
 
-    b_idxs = keep_idxs[0] > 0
+    exclude_policy_idxs = torch.tensor(
+        [config.get_policy_idx(policy_id) for policy_id in exclude_policy_ids]
+    )
+    # keep sequences where ALL of the partner policy idxs are NOT IN the exclude list
+    # [0] is used here to select first entry of each sequence (since policy ID doesn't
+    # change within a sequence) shape=(B, N-1)
+    keep_idxs = torch.all(
+        torch.isin(batch["partner_policy_idxs"][0], exclude_policy_idxs, invert=True),
+        dim=-1,
+    )
+
     filtered_batch = {}
     for k, b in batch.items():
         if k == "initial_lstm_states":
-            filtered_batch[k] = (b[0][:, b_idxs], b[1][:, b_idxs])
+            filtered_batch[k] = (b[0][:, keep_idxs], b[1][:, keep_idxs])
         elif k == "policy_stats":
             # already split by policy in worker, nothing we can do here
             # but this won't be used in training anyway
             filtered_batch[k] = b
         else:
-            filtered_batch[k] = b[:, b_idxs]
+            filtered_batch[k] = b[:, keep_idxs]
     return filtered_batch
 
 

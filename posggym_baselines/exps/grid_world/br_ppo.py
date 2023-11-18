@@ -1,22 +1,20 @@
 """K-Level Reasoning PPO (KLR-PPO) training for POSGGym grid world environments"""
 import math
 import argparse
-from typing import Callable, Optional
+from typing import Callable, Optional, Dict, List
 import yaml
 from copy import deepcopy
 
 import posggym
+import posggym.agents as pga
+from posggym.agents.wrappers import AgentEnvWrapper
 from posggym.wrappers import FlattenObservations, RecordVideo
-import seaborn as sns
-import matplotlib.pyplot as plt
 
 from posggym_baselines.utils import strtobool, NoOverwriteRecordVideo
 from posggym_baselines.ppo.config import PPOConfig
-from posggym_baselines.ppo.klr_ppo import KLRPPOConfig
+from posggym_baselines.ppo.br_ppo import BRPPOConfig
 from posggym_baselines.ppo.core import run_ppo, load_policies
 from posggym_baselines.ppo.eval import (
-    run_train_distribution_evaluation,
-    run_all_pairwise_evaluation,
     render_policies,
 )
 
@@ -24,7 +22,7 @@ from posggym_baselines.ppo.eval import (
 DEFAULT_CONFIG = {
     "eval_fns": [],
     # general config
-    "exp_name": "klr_ppo",
+    "exp_name": "br_ppo",
     "seed": 0,
     "cuda": True,
     "torch_deterministic": False,
@@ -41,7 +39,7 @@ DEFAULT_CONFIG = {
     "eval_episodes": 100,
     "num_eval_envs": 32,
     # training config
-    "total_timesteps": int(3.2e7),
+    "total_timesteps": int(1e8),
     "num_workers": 2,
     "num_envs": 32,
     "num_rollout_steps": 64,
@@ -71,6 +69,29 @@ DEFAULT_CONFIG = {
 }
 
 
+class OtherAgentFn:
+    """Function for loading other agents.
+
+    This is a callable class that can be pickled and passed to the workers.
+    """
+
+    def __init__(self, agent_policy_ids: Dict[str, List[str]], verbose: bool = False):
+        self.agent_policy_ids = agent_policy_ids
+        self.verbose = verbose
+        self.policies = {i: {} for i in agent_policy_ids}
+
+    def __call__(self, model: posggym.POSGModel) -> Dict[str, pga.Policy]:
+        other_agents = {}
+        for agent_id in self.agent_policy_ids:
+            pi_id = model.rng.choice(self.agent_policy_ids[agent_id])
+            if pi_id not in self.policies[agent_id]:
+                self.policies[agent_id][pi_id] = pga.make(pi_id, model, agent_id)
+            other_agents[agent_id] = self.policies[agent_id][pi_id]
+            if self.verbose:
+                print(f"Loaded {pi_id} for {agent_id}")
+        return other_agents
+
+
 def get_env_creator_fn(
     config: PPOConfig, env_idx: int, worker_idx: Optional[int] = None
 ) -> Callable:
@@ -82,6 +103,8 @@ def get_env_creator_fn(
         env = posggym.make(config.env_id, render_mode=render_mode, **config.env_kwargs)
         if capture_video:
             env = RecordVideo(env, config.video_dir)
+
+        env = AgentEnvWrapper(env, config.other_agent_fn)
         env = FlattenObservations(env)
 
         seed = config.seed + env_idx
@@ -118,6 +141,7 @@ def get_eval_env_creator_fn(
                     lambda ep: ep % max(1, eval_episodes_per_env // 10) == 0
                 ),
             )
+        env = AgentEnvWrapper(env, config.other_agent_fn)
         env = FlattenObservations(env)
 
         seed = config.seed + env_idx
@@ -137,6 +161,7 @@ def get_render_env_creator_fn(
 
     def thunk():
         env = posggym.make(config.env_id, render_mode="human", **config.env_kwargs)
+        env = AgentEnvWrapper(env, config.other_agent_fn)
         env = FlattenObservations(env)
 
         seed = config.seed + env_idx
@@ -150,18 +175,18 @@ def get_render_env_creator_fn(
 
 
 def train(args):
-    if args.env_kwargs_file is not None:
-        with open(args.env_kwargs_file, "r") as f:
-            env_kwargs = yaml.safe_load(f)
-    else:
-        env_kwargs = {}
+    with open(args.env_kwargs_file, "r") as f:
+        env_kwargs = yaml.safe_load(f)
+
+    with open(args.other_agents_file, "r") as f:
+        other_agent_policy_ids = yaml.safe_load(f)
 
     config_kwargs = deepcopy(DEFAULT_CONFIG)
     config_kwargs.update(
         {
             "env_creator_fn": get_env_creator_fn,
-            "env_id": args.env_id,
-            "env_kwargs": env_kwargs,
+            "env_id": env_kwargs["env_id"],
+            "env_kwargs": env_kwargs["env_kwargs"],
         }
     )
 
@@ -169,11 +194,9 @@ def train(args):
         if k in config_kwargs:
             config_kwargs[k] = v
 
-    config = KLRPPOConfig(
-        # KLR-PPO specific config
-        max_reasoning_level=args.max_reasoning_level,
-        include_BR=args.include_BR,
-        filter_experience=True,
+    config = BRPPOConfig(
+        # BR-PPO specific config
+        other_agent_fn=OtherAgentFn(other_agent_policy_ids),
         **config_kwargs,
     )
     print(config)
@@ -181,109 +204,43 @@ def train(args):
     run_ppo(config)
 
 
-def eval(args):
-    if args.env_kwargs_file is not None:
-        with open(args.env_kwargs_file, "r") as f:
-            env_kwargs = yaml.safe_load(f)
-    else:
-        env_kwargs = {}
-
-    config_kwargs = deepcopy(DEFAULT_CONFIG)
-    config_kwargs.update(
-        {
-            "env_creator_fn": get_eval_env_creator_fn,
-            "env_id": args.env_id,
-            "env_kwargs": env_kwargs,
-            "eval_episodes": 100,
-        }
-    )
-    for k, v in vars(args).items():
-        if k in config_kwargs:
-            config_kwargs[k] = v
-
-    config = KLRPPOConfig(
-        # KLR-PPO specific config
-        max_reasoning_level=args.max_reasoning_level,
-        include_BR=args.include_BR,
-        filter_experience=True,
-        **config_kwargs,
-    )
-
-    policies = load_policies(config, args.saved_model_dir, device=config.eval_device)
-
-    if args.eval_train_distribution:
-        pairwise_results = run_train_distribution_evaluation(policies, config)
-        pairwise_returns = pairwise_results[0]
-        pairwise_stds = pairwise_results[1]
-    else:
-        pairwise_results = run_all_pairwise_evaluation(policies, config)
-        pairwise_returns = pairwise_results["pairwise_returns1"]
-        pairwise_stds = pairwise_results["pairwise_returns_std1"]
-
-    fig, axs = plt.subplots(1, 2, figsize=(10, 6))
-
-    sns.set_theme()
-    sns.set_style("whitegrid")
-    sns.heatmap(
-        pairwise_returns,
-        ax=axs[0],
-        annot=True,
-        fmt=".2f",
-        cmap="viridis",
-        yticklabels=list(policies),
-        xticklabels=list(policies),
-    )
-
-    sns.heatmap(
-        pairwise_stds,
-        ax=axs[1],
-        annot=True,
-        fmt=".2f",
-        cmap="viridis",
-        yticklabels=list(policies),
-        xticklabels=list(policies),
-    )
-
-    plt.show()
-
-
 def render(args):
-    if args.env_kwargs_file is not None:
-        with open(args.env_kwargs_file, "r") as f:
-            env_kwargs = yaml.safe_load(f)
-    else:
-        env_kwargs = {}
+    with open(args.env_kwargs_file, "r") as f:
+        env_kwargs = yaml.safe_load(f)
+
+    with open(args.other_agents_file, "r") as f:
+        other_agent_policy_ids = yaml.safe_load(f)
 
     config_kwargs = deepcopy(DEFAULT_CONFIG)
     config_kwargs.update(
         {
             "env_creator_fn": get_render_env_creator_fn,
-            "env_id": args.env_id,
-            "env_kwargs": env_kwargs,
+            "env_id": env_kwargs["env_id"],
+            "env_kwargs": env_kwargs["env_kwargs"],
         }
     )
     for k, v in vars(args).items():
         if k in config_kwargs:
             config_kwargs[k] = v
 
-    config = KLRPPOConfig(
-        # KLR-PPO specific config
-        max_reasoning_level=args.max_reasoning_level,
-        include_BR=args.include_BR,
-        filter_experience=True,
+    config = BRPPOConfig(
+        # BR-PPO specific config
+        other_agent_fn=OtherAgentFn(other_agent_policy_ids, verbose=True),
         **config_kwargs,
     )
 
     policies = load_policies(config, args.saved_model_dir, device=config.eval_device)
 
     env = config.load_vec_env(num_envs=1)
+    agent_ids = env.possible_agents
 
     for policy_id in policies:
         partner_dist = config.get_policy_partner_distribution(policy_id)
         render_policies(
-            [
-                {policy_id: policies[policy_id]},
-                {pi_id: policies[pi_id] for pi_id in partner_dist},
+            [{policy_id: policies[policy_id]}]
+            + [
+                {pi_id: policies[pi_id] for pi_id in partner_dist}
+                for _ in agent_ids[1:]
             ],
             num_episodes=25,
             env=env,
@@ -298,37 +255,24 @@ if __name__ == "__main__":
     parser.add_argument(
         "action",
         type=str,
-        choices=["train", "eval", "render"],
+        choices=["train", "render"],
         help="Whether to train new policies or evaluate some saved policies.",
-    )
-    parser.add_argument(
-        "--env_id",
-        type=str,
-        help="Grid world environmend ID.",
     )
     parser.add_argument(
         "--env_kwargs_file",
         type=str,
-        default=None,
         help="Path to YAML file containing env kwargs.",
+    )
+    parser.add_argument(
+        "--other_agents_file",
+        type=str,
+        help="Path to YAML file containing other agent policy ids map.",
     )
     parser.add_argument(
         "--exp_name",
         type=str,
-        default="klr_ppo",
+        default="br_ppo",
         help="Name of experiment.",
-    )
-    parser.add_argument(
-        "--max_reasoning_level",
-        type=int,
-        default=4,
-        help="Number of reasoning levels K.",
-    )
-    parser.add_argument(
-        "--include_BR",
-        type=strtobool,
-        default=True,
-        help="Whether to include best-response policy in population.",
     )
     parser.add_argument(
         "--track_wandb",
@@ -363,7 +307,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--total_timesteps",
         type=int,
-        default=int(3.2e6),
+        default=int(1e8),
         help="Total number of training timesteps.",
     )
     parser.add_argument(
@@ -376,21 +320,12 @@ if __name__ == "__main__":
         "--saved_model_dir",
         type=str,
         default=None,
-        help="Directory containing saved models (required if running eval).",
-    )
-    parser.add_argument(
-        "--eval_train_distribution",
-        type=strtobool,
-        default=True,
-        help="Whether to run evaluation for training distribution only.",
+        help="Directory containing saved models (required if running render).",
     )
     args = parser.parse_args()
 
     if args.action == "train":
         train(args)
-    elif args.action == "eval":
-        assert args.saved_model_dir is not None
-        eval(args)
     elif args.action == "render":
         assert args.saved_model_dir is not None
         render(args)
