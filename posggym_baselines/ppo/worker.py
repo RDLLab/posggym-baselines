@@ -6,13 +6,14 @@ import torch.multiprocessing as mp
 
 import posggym_baselines.ppo.utils as ppo_utils
 from posggym_baselines.ppo.config import PPOConfig
+import contextlib
 
 
 def run_rollout_worker(
     worker_id: int,
     config: PPOConfig,
-    recv_queue: mp.Queue,
-    send_queue: mp.Queue,
+    recv_queue: mp.JoinableQueue,
+    send_queue: mp.JoinableQueue,
     terminate_event: mp.Event,
 ):
     """Rollout worker function for collecting trajectories.
@@ -25,15 +26,15 @@ def run_rollout_worker(
 
     Arguments
     ---------
-    worker_id: int
+    worker_id
         The id of this rollout worker.
-    config: BaseConfig
+    config
         The configuration for this rollout worker.
-    recv_queue: mp.Queue
+    recv_queue
         The queue from which to recieve the policy weights, etc from the learner.
-    send_queue: mp.Queue
+    send_queue
         The queue to which to send the collected trajectories to the learner.
-    terminate_event: mp.Event
+    terminate_event
         The event which signals the rollout worker to terminate.
 
     """
@@ -102,28 +103,28 @@ def run_rollout_worker(
         for agent_idx, policy_id in enumerate(env_policies):
             sampled_policy_idxs[env_idx, agent_idx] = policy_id_to_idx[policy_id]
 
+    # Get reference to learner weights
+    policy_weights = {}
+    while len(policy_weights) == 0 and not terminate_event.is_set():
+        with contextlib.suppress(Empty):
+            policy_weights = recv_queue.get(timeout=1)
+    assert len(policy_weights) == len(config.train_policies)
+
     # start batch collection loop
     print(f"Worker {worker_id} - Starting batch collection loop.")
     while not terminate_event.is_set():
-        # wait for latest weights from learner
-        policy_weights = {}
+        # wait for signal from learner to start batch collection
         while not terminate_event.is_set():
-            try:
-                policy_weights = recv_queue.get(timeout=1)
+            with contextlib.suppress(Empty):
+                recv_queue.get(timeout=1)
+                recv_queue.task_done()
                 break
-            except Empty:
-                pass
-
         if terminate_event.is_set():
             break
 
         # sync weights
-        assert len(policy_weights) == len(config.train_policies)
         for policy_id, weights in policy_weights.items():
             policies[policy_id].load_state_dict(weights)
-
-        # delete reference to learner weights to free any shared CUDA memory reference
-        del policy_weights
 
         # collect batch of experience
         policy_episode_stats = {pi_id: [] for pi_id in config.get_all_policy_ids()}
@@ -302,6 +303,15 @@ def run_rollout_worker(
                 "policy_stats": policy_stats,
             }
         )
+
+    print(f"Worker {worker_id} - Termination signal recieved.")
     envs.close()
+
+    print(f"Worker {worker_id} - Releasing shared resources.")
+    del policy_weights
+    recv_queue.task_done()
+
+    print(f"Worker {worker_id} - Waiting for shared resources to be released.")
+    send_queue.join()
 
     print(f"Worker {worker_id} - Terminated.")

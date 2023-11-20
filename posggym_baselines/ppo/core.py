@@ -1,4 +1,5 @@
 """The core PPO learner."""
+import contextlib
 import os
 import time
 from datetime import timedelta
@@ -35,8 +36,6 @@ class PPOLearner:
             self.writer = logger.TensorBoardLogger(config)
 
         self.policies = config.load_policies(device=config.device)
-        for policy_id in self.config.train_policies:
-            self.policies[policy_id].share_memory()
 
         self.optimizers = {
             policy_id: optim.Adam(
@@ -47,10 +46,10 @@ class PPOLearner:
 
     def train(
         self,
-        worker_recv_queues: List[mp.Queue],
-        worker_send_queues: List[mp.Queue],
-        eval_recv_queue: Optional[mp.Queue],
-        eval_send_queue: Optional[mp.Queue],
+        worker_recv_queues: List[mp.JoinableQueue],
+        worker_send_queues: List[mp.JoinableQueue],
+        eval_recv_queue: Optional[mp.JoinableQueue],
+        eval_send_queue: Optional[mp.JoinableQueue],
         termination_event: mp.Event,
     ):
         """Run PPO training.
@@ -74,6 +73,21 @@ class PPOLearner:
             assert eval_recv_queue is not None
             assert eval_send_queue is not None
 
+        # share the shared memory reference of policies with workers
+        shared_policies = {
+            policy_id: policy.share_memory()
+            for policy_id, policy in self.config.load_policies(
+                self.config.worker_device
+            ).items()
+            if policy_id in self.config.train_policies
+        }
+        shared_policy_states = {
+            policy_id: policy.state_dict()
+            for policy_id, policy in shared_policies.items()
+        }
+        for i in range(self.config.num_workers):
+            worker_recv_queues[i].put(shared_policy_states)
+
         global_step = 0
         update = 1
         train_start_time = time.time()
@@ -85,16 +99,16 @@ class PPOLearner:
                 for optimizer in self.optimizers.values():
                     optimizer.param_groups[0]["lr"] = lrnow
 
-            # current model state to share with workers
-            policy_states = {
-                policy_id: self.policies[policy_id].state_dict()
-                for policy_id in self.config.train_policies
-            }
+            # sync shared memory policies with current model state
+            for policy_id in self.config.train_policies:
+                shared_policies[policy_id].load_state_dict(
+                    self.policies[policy_id].state_dict()
+                )
 
             experience_collection_start_time = time.time()
             # signal workers to collect next batch of experience
             for i in range(self.config.num_workers):
-                worker_recv_queues[i].put(policy_states)
+                worker_recv_queues[i].put("GO")
 
             # wait for workers to finish collecting experience
             worker_batches = []
@@ -103,13 +117,12 @@ class PPOLearner:
                 next_worker_id < self.config.num_workers
                 and not termination_event.is_set()
             ):
-                try:
+                with contextlib.suppress(Empty):
                     # wait for worker batch, with timeout for checking for termination
-                    batch = worker_send_queues[next_worker_id].get(timeout=1)
-                    worker_batches.append(batch)
+                    worker_batches.append(
+                        worker_send_queues[next_worker_id].get(timeout=1)
+                    )
                     next_worker_id += 1
-                except Empty:
-                    pass
             if termination_event.is_set():
                 break
 
@@ -117,6 +130,8 @@ class PPOLearner:
             combined_batch = ppo_utils.combine_batches(worker_batches, self.config)
             # free any references to worker tensors stored in shared memory
             worker_batches = []
+            for worker_id in range(self.config.num_workers):
+                worker_send_queues[worker_id].task_done()
 
             experience_collection_time = time.time() - experience_collection_start_time
             global_step += self.config.batch_size
@@ -392,8 +407,8 @@ class PPOLearner:
     def evaluate(
         self,
         global_step: int,
-        eval_recv_queue: mp.Queue,
-        eval_send_queue: mp.Queue,
+        eval_recv_queue: mp.JoinableQueue,
+        eval_send_queue: mp.JoinableQueue,
         termination_event: mp.Event,
         final_eval: bool,
     ):
@@ -454,6 +469,7 @@ class PPOLearner:
                 if final_eval:
                     evals_to_log = eval_results["global_step"] != global_step
 
+                eval_send_queue.task_done()
             except Empty:
                 evals_to_log = final_eval
 
@@ -521,10 +537,10 @@ def load_policies(
 
 def run_learner(
     config: "PPOConfig",
-    worker_recv_queues: List[mp.Queue],
-    worker_send_queues: List[mp.Queue],
-    eval_recv_queue: Optional[mp.Queue],
-    eval_send_queue: Optional[mp.Queue],
+    worker_recv_queues: List[mp.JoinableQueue],
+    worker_send_queues: List[mp.JoinableQueue],
+    eval_recv_queue: Optional[mp.JoinableQueue],
+    eval_send_queue: Optional[mp.JoinableQueue],
     termination_event: mp.Event,
 ):
     """Run PPO learner process.
@@ -568,6 +584,12 @@ def run_learner(
         termination_event.set()
         print("learner: Training complete.")
 
+    for q in worker_recv_queues:
+        q.join()
+
+    if eval_recv_queue is not None:
+        eval_recv_queue.join()
+
     print("learner: All done")
 
 
@@ -591,8 +613,8 @@ def run_ppo(config: "PPOConfig"):
     worker_send_queues = []
     workers = []
     for worker_id in range(config.num_workers):
-        worker_recv_queues.append(mp_ctxt.Queue())
-        worker_send_queues.append(mp_ctxt.Queue())
+        worker_recv_queues.append(mp_ctxt.JoinableQueue())
+        worker_send_queues.append(mp_ctxt.JoinableQueue())
         worker = mp_ctxt.Process(
             target=run_rollout_worker,
             args=(
@@ -609,8 +631,8 @@ def run_ppo(config: "PPOConfig"):
     # create eval worker and queues for communication
     if config.eval_interval > 0:
         # set max size so learner can't get too far ahead of eval
-        eval_recv_queue = mp_ctxt.Queue(maxsize=5)
-        eval_send_queue = mp_ctxt.Queue()
+        eval_recv_queue = mp_ctxt.JoinableQueue(maxsize=5)
+        eval_send_queue = mp_ctxt.JoinableQueue()
         eval_worker = mp_ctxt.Process(
             target=run_eval_worker,
             args=(
