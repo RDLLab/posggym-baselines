@@ -65,6 +65,8 @@ class PPOConfig:
     wandb_project: str = "posggym_baselines"
     # wandb entity name
     wandb_entity: str = None
+    # wandb group name
+    wandb_group: str = None
     # Directory where the model and logs will be saved
     log_dir: str = field(init=False)
     # Directory where videos will be saved

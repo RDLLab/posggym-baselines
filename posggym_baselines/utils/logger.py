@@ -57,6 +57,7 @@ class TensorBoardLogger(Logger):
             wandb.init(
                 project=config.wandb_project,
                 entity=config.wandb_entity,
+                group=config.wandb_group,
                 sync_tensorboard=True,
                 config=vars(config),
                 name=config.run_name,

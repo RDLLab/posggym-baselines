@@ -30,6 +30,8 @@ DEFAULT_CONFIG = {
     "disable_logging": False,
     "track_wandb": True,
     "wandb_project": "posggym_baselines",
+    "wandb_entity": None,
+    "wandb_group": None,
     "load_dir": None,
     "save_interval": -1,
     # env config
@@ -238,6 +240,12 @@ if __name__ == "__main__":
         type=strtobool,
         default=True,
         help="Whether to track the experiment with wandb.",
+    )
+    parser.add_argument(
+        "--wandb_group",
+        type=str,
+        default=None,
+        help="Optional wandb group name.",
     )
     parser.add_argument(
         "--disable_logging",
