@@ -53,6 +53,8 @@ class PPOConfig:
     # Whether to set torch to deterministic mode
     # `torch.backends.cudnn.deterministic=False`
     torch_deterministic: bool = True
+    # Device to use for learner model
+    device: torch.device = field(init=False)
     # Device to use for running rollout workers
     worker_device: torch.device = torch.device("cpu")
     # whether to disable logging (for testing purposes)
@@ -63,6 +65,12 @@ class PPOConfig:
     wandb_project: str = "posggym_baselines"
     # wandb entity name
     wandb_entity: str = None
+    # Directory where the model and logs will be saved
+    log_dir: str = field(init=False)
+    # Directory where videos will be saved
+    video_dir: str = field(init=False)
+    # Directory where models will be saved
+    model_dir: str = field(init=False)
     # optional directory to load existing algorithm/model from
     load_dir: str = None
     # number of updates (i.e. batches) after which the model/algorithm is saved
@@ -98,6 +106,8 @@ class PPOConfig:
 
     # total timesteps for training
     total_timesteps: int = 10000000
+    # total number of updates during training
+    num_updates: int = field(init=False)
     # number of steps per update batch
     # *warning*: needs to be initialized in post_init of child class
     batch_size: int = field(init=False)
@@ -160,11 +170,9 @@ class PPOConfig:
             self.run_name += f"_{self.env_id}"
         self.run_name += f"_{self.seed}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
-        self.worker_device = torch.device(self.worker_device if self.cuda else "cpu")
-        self.eval_device = torch.device(self.eval_device if self.cuda else "cpu")
-
-        self.batch_size = self.num_rollout_steps * self.num_envs * self.num_workers
-        self.minibatch_num_seqs = self.minibatch_size // self.seq_len
+        self.log_dir = os.path.join(BASE_RESULTS_DIR, self.run_name)
+        self.video_dir = os.path.join(self.log_dir, "videos")
+        self.model_dir = os.path.join(self.log_dir, "models")
 
         if not self.disable_logging:
             os.makedirs(os.path.dirname(self.log_dir), exist_ok=True)
@@ -172,12 +180,25 @@ class PPOConfig:
             os.makedirs(self.video_dir, exist_ok=True)
             os.makedirs(self.model_dir, exist_ok=True)
 
-        if len(self.eval_fns) == 0:
-            self.eval_interval = 0
+        self.device = torch.device(
+            "cuda" if torch.cuda.is_available() and self.cuda else "cpu"
+        )
+        self.worker_device = torch.device(self.worker_device if self.cuda else "cpu")
+        self.eval_device = torch.device(self.eval_device if self.cuda else "cpu")
+
+        self.batch_size = self.num_rollout_steps * self.num_envs * self.num_workers
+        self.minibatch_num_seqs = self.minibatch_size // self.seq_len
+
+        self.num_updates = (self.total_timesteps // self.batch_size) + int(
+            self.total_timesteps % self.batch_size != 0
+        )
 
         if self.save_interval == -1:
             self.save_interval = self.num_updates
-        if self.eval_interval == -1:
+
+        if len(self.eval_fns) == 0:
+            self.eval_interval = 0
+        elif self.eval_interval == -1:
             self.eval_interval = self.num_updates
 
         if self.seed is not None:
@@ -196,45 +217,6 @@ class PPOConfig:
         self.act_space = env.action_spaces[env.possible_agents[0]]
         for i, act_space in env.action_spaces.items():
             assert act_space == self.act_space, "All agents must have same act space"
-
-    @property
-    def log_dir(self) -> str:
-        """Directory where the model and logs will be saved."""
-        return os.path.join(BASE_RESULTS_DIR, self.run_name)
-
-    @property
-    def video_dir(self) -> str:
-        """Directory where videos will be saved."""
-        return os.path.join(self.log_dir, "videos")
-
-    @property
-    def model_dir(self) -> str:
-        """Directory where models will be saved."""
-        return os.path.join(self.log_dir, "models")
-
-    @property
-    def device(self) -> torch.device:
-        """Device where learner model is run."""
-        return torch.device(
-            "cuda" if torch.cuda.is_available() and self.cuda else "cpu"
-        )
-
-    @property
-    def num_updates(self) -> int:
-        """The total number of updates during training."""
-        if self.total_timesteps % self.batch_size == 0:
-            return self.total_timesteps // self.batch_size
-        return (self.total_timesteps // self.batch_size) + 1
-
-    @property
-    def num_seqs_per_rollout(self) -> int:
-        """The number of chunk sequences per individial environment rollout."""
-        return self.num_rollout_steps // self.seq_len
-
-    @property
-    def num_seqs_per_batch(self) -> int:
-        """Number of sequences/chunks per batch."""
-        return (self.num_envs * self.num_workers) * self.num_seqs_per_rollout
 
     def load_vec_env(self, num_envs: int | None = None, worker_idx: int | None = None):
         """Load the vectorized environment."""

@@ -1,18 +1,18 @@
 """K-Level Reasoning PPO (KLR-PPO) training for POSGGym grid world environments"""
 import math
+from pprint import pprint
 import argparse
-from typing import Callable, Optional, Dict, List
+from typing import Callable, Optional
 import yaml
 from copy import deepcopy
 
 import posggym
-import posggym.agents as pga
 from posggym.agents.wrappers import AgentEnvWrapper
 from posggym.wrappers import FlattenObservations, RecordVideo
 
 from posggym_baselines.utils import strtobool, NoOverwriteRecordVideo
 from posggym_baselines.ppo.config import PPOConfig
-from posggym_baselines.ppo.br_ppo import BRPPOConfig
+from posggym_baselines.ppo.br_ppo import BRPPOConfig, UniformOtherAgentFn
 from posggym_baselines.ppo.core import run_ppo, load_policies
 from posggym_baselines.ppo.eval import (
     render_policies,
@@ -67,29 +67,6 @@ DEFAULT_CONFIG = {
     "trunk_sizes": [64, 64],
     "head_sizes": [64],
 }
-
-
-class OtherAgentFn:
-    """Function for loading other agents.
-
-    This is a callable class that can be pickled and passed to the workers.
-    """
-
-    def __init__(self, agent_policy_ids: Dict[str, List[str]], verbose: bool = False):
-        self.agent_policy_ids = agent_policy_ids
-        self.verbose = verbose
-        self.policies = {i: {} for i in agent_policy_ids}
-
-    def __call__(self, model: posggym.POSGModel) -> Dict[str, pga.Policy]:
-        other_agents = {}
-        for agent_id in self.agent_policy_ids:
-            pi_id = model.rng.choice(self.agent_policy_ids[agent_id])
-            if pi_id not in self.policies[agent_id]:
-                self.policies[agent_id][pi_id] = pga.make(pi_id, model, agent_id)
-            other_agents[agent_id] = self.policies[agent_id][pi_id]
-            if self.verbose:
-                print(f"Loaded {pi_id} for {agent_id}")
-        return other_agents
 
 
 def get_env_creator_fn(
@@ -174,7 +151,7 @@ def get_render_env_creator_fn(
     return thunk
 
 
-def train(args):
+def load_config(args, env_fn):
     with open(args.env_kwargs_file, "r") as f:
         env_kwargs = yaml.safe_load(f)
 
@@ -184,7 +161,7 @@ def train(args):
     config_kwargs = deepcopy(DEFAULT_CONFIG)
     config_kwargs.update(
         {
-            "env_creator_fn": get_env_creator_fn,
+            "env_creator_fn": env_fn,
             "env_id": env_kwargs["env_id"],
             "env_kwargs": env_kwargs["env_kwargs"],
         }
@@ -196,39 +173,21 @@ def train(args):
 
     config = BRPPOConfig(
         # BR-PPO specific config
-        other_agent_fn=OtherAgentFn(other_agent_policy_ids),
+        other_agent_ids=other_agent_policy_ids,
+        other_agent_fn=UniformOtherAgentFn(other_agent_policy_ids),
         **config_kwargs,
     )
-    print(config)
+    pprint(config)
+    return config
 
+
+def train(args):
+    config = load_config(args, get_env_creator_fn)
     run_ppo(config)
 
 
 def render(args):
-    with open(args.env_kwargs_file, "r") as f:
-        env_kwargs = yaml.safe_load(f)
-
-    with open(args.other_agents_file, "r") as f:
-        other_agent_policy_ids = yaml.safe_load(f)
-
-    config_kwargs = deepcopy(DEFAULT_CONFIG)
-    config_kwargs.update(
-        {
-            "env_creator_fn": get_render_env_creator_fn,
-            "env_id": env_kwargs["env_id"],
-            "env_kwargs": env_kwargs["env_kwargs"],
-        }
-    )
-    for k, v in vars(args).items():
-        if k in config_kwargs:
-            config_kwargs[k] = v
-
-    config = BRPPOConfig(
-        # BR-PPO specific config
-        other_agent_fn=OtherAgentFn(other_agent_policy_ids, verbose=True),
-        **config_kwargs,
-    )
-
+    config = load_config(args, get_render_env_creator_fn)
     policies = load_policies(config, args.saved_model_dir, device=config.eval_device)
 
     env = config.load_vec_env(num_envs=1)
