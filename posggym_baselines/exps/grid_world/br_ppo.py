@@ -12,7 +12,7 @@ from posggym.wrappers import FlattenObservations, RecordVideo
 
 from posggym_baselines.utils import strtobool, NoOverwriteRecordVideo
 from posggym_baselines.ppo.config import PPOConfig
-from posggym_baselines.ppo.br_ppo import BRPPOConfig, UniformOtherAgentFn
+from posggym_baselines.ppo.br_ppo import BRPPOConfig
 from posggym_baselines.ppo.core import run_ppo, load_policies
 from posggym_baselines.ppo.eval import (
     render_policies,
@@ -71,6 +71,10 @@ DEFAULT_CONFIG = {
 }
 
 
+def ep_trig(ep):
+    return ep % 200 == 0
+
+
 def get_env_creator_fn(
     config: PPOConfig, env_idx: int, worker_idx: Optional[int] = None
 ) -> Callable:
@@ -81,9 +85,9 @@ def get_env_creator_fn(
         render_mode = "rgb_array" if capture_video else None
         env = posggym.make(config.env_id, render_mode=render_mode, **config.env_kwargs)
         if capture_video:
-            env = RecordVideo(env, config.video_dir)
+            env = RecordVideo(env, config.video_dir, episode_trigger=ep_trig)
 
-        env = AgentEnvWrapper(env, config.other_agent_fn)
+        env = AgentEnvWrapper(env, config.get_other_agent_fn())
         env = FlattenObservations(env)
 
         seed = config.seed + env_idx
@@ -120,7 +124,7 @@ def get_eval_env_creator_fn(
                     lambda ep: ep % max(1, eval_episodes_per_env // 10) == 0
                 ),
             )
-        env = AgentEnvWrapper(env, config.other_agent_fn)
+        env = AgentEnvWrapper(env, config.get_other_agent_fn())
         env = FlattenObservations(env)
 
         seed = config.seed + env_idx
@@ -140,7 +144,7 @@ def get_render_env_creator_fn(
 
     def thunk():
         env = posggym.make(config.env_id, render_mode="human", **config.env_kwargs)
-        env = AgentEnvWrapper(env, config.other_agent_fn)
+        env = AgentEnvWrapper(env, config.get_other_agent_fn())
         env = FlattenObservations(env)
 
         seed = config.seed + env_idx
@@ -176,7 +180,6 @@ def load_config(args, env_fn):
     config = BRPPOConfig(
         # BR-PPO specific config
         other_agent_ids=other_agent_policy_ids,
-        other_agent_fn=UniformOtherAgentFn(other_agent_policy_ids),
         **config_kwargs,
     )
     pprint(config)

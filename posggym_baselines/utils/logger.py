@@ -107,7 +107,6 @@ class TensorBoardLogger(Logger):
                                 os.path.join(self.config.video_dir, filename)
                             )
                         },
-                        step=step,
                     )
                     self.uploaded_video_files.add(filename)
 

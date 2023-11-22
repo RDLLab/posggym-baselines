@@ -48,13 +48,9 @@ class BRPPOConfig(PPOConfig):
     exp_name: str = "br_ppo"
     # other agent policy ids
     other_agent_ids: Dict[str, List[str]] = None
-    # function for generating other agents
-    other_agent_fn: Callable[[posggym.POSGModel], Dict[str, pga.Policy]] = None
 
     def __post_init__(self):
-        if self.other_agent_fn is None:
-            assert self.other_agent_ids is not None
-            self.other_agent_fn = UniformOtherAgentFn(self.other_agent_ids)
+        assert self.other_agent_ids is not None
         super().__post_init__()
 
         env = self.env_creator_fn(self, 0, None)()
@@ -85,3 +81,8 @@ class BRPPOConfig(PPOConfig):
     @property
     def train_policies(self) -> List[str]:
         return self.get_all_policy_ids()
+
+    def get_other_agent_fn(
+        self,
+    ) -> Callable[[posggym.POSGModel], Dict[str, pga.Policy]]:
+        return UniformOtherAgentFn(self.other_agent_ids)
