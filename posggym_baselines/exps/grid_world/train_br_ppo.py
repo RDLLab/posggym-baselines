@@ -1,4 +1,4 @@
-"""K-Level Reasoning PPO (KLR-PPO) training for POSGGym grid world environments"""
+"""BR PPO (BR-PPO) training for POSGGym grid world environments"""
 import math
 from pprint import pprint
 import argparse
