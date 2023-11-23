@@ -1,0 +1,5 @@
+env_id: "PursuitEvasion-v1"
+env_kwargs:
+  grid: "16x16"
+  max_obs_distance: 12
+  use_progress_reward: True

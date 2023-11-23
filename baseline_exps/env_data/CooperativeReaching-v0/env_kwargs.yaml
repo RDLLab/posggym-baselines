@@ -1,0 +1,6 @@
+env_id: "CooperativeReaching-v0"
+env_kwargs:
+  size: 5
+  num_goals: 4
+  mode: "original"
+  obs_distance: null
