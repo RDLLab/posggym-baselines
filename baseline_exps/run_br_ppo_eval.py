@@ -8,7 +8,9 @@ from pprint import pprint
 from itertools import product
 from typing import Callable, Optional, Tuple, Dict
 from copy import deepcopy
+import time
 
+import torch
 import numpy as np
 import torch
 import posggym
@@ -61,18 +63,28 @@ def get_env_creator_fn(
     return thunk
 
 
-def get_env_data(env_id):
+def get_env_data(env_id, agent_id):
     """Get the env data for the given env name."""
-    env_data_path = os.path.join(ENV_DATA_DIR, env_id)
+    if agent_id is None:
+        env_data_path = os.path.join(ENV_DATA_DIR, env_id)
+    else:
+        env_data_path = os.path.join(ENV_DATA_DIR, f"{env_id}_{agent_id}")
+
     env_kwargs_file = os.path.join(env_data_path, "env_kwargs.yaml")
     with open(env_kwargs_file, "r") as f:
         env_kwargs = yaml.safe_load(f)
 
-    agents_P0_file = os.path.join(env_data_path, "agents_P0.yaml")
+    agents_P0_file = os.path.join(
+        env_data_path,
+        "agents_P0.yaml" if agent_id is None else f"agents_P0_{agent_id}.yaml",
+    )
     with open(agents_P0_file, "r") as f:
         agents_P0 = yaml.safe_load(f)
 
-    agents_P1_file = os.path.join(env_data_path, "agents_P1.yaml")
+    agents_P1_file = os.path.join(
+        env_data_path,
+        "agents_P1.yaml" if agent_id is None else f"agents_P1_{agent_id}.yaml",
+    )
     with open(agents_P1_file, "r") as f:
         agents_P1 = yaml.safe_load(f)
 
@@ -83,7 +95,12 @@ def get_env_data(env_id):
         model_name = model_file_name.replace(".pt", "")
         tokens = model_name.split("_")
         train_pop = tokens[0]
-        seed = int(tokens[1].replace("seed", ""))
+        if agent_id is not None:
+            assert tokens[1].startswith("i")
+            assert tokens[1] == agent_id
+            seed = int(tokens[2].replace("seed", ""))
+        else:
+            seed = int(tokens[1].replace("seed", ""))
         br_model_files[train_pop][seed] = os.path.join(br_models_dir, model_file_name)
 
     results_file = os.path.join(env_data_path, "br_results.csv")
@@ -220,8 +237,9 @@ def run_evaluation_episodes(
 
 
 def main(args):
+    torch.set_num_threads(1)
     env_kwargs, agents_P0, agents_P1, br_model_files, results_file = get_env_data(
-        args.env_id
+        args.env_id, args.agent_id
     )
     print("env_kwargs:")
     pprint(env_kwargs)
@@ -251,14 +269,18 @@ def main(args):
         writer.writeheader()
 
     for train_pop, test_pop in product(["P0", "P1"], ["P0", "P1"]):
-        config = configs[train_pop]
+        train_config = configs[train_pop]
+        test_config = configs[test_pop]
+        br_policy = train_config.load_policies(device=test_config.eval_device)["BR"]
+        br_policy.eval()
         for seed, br_model_file in br_model_files[train_pop].items():
             print(f"Running BR-PPO eval for {train_pop} -> {test_pop} (seed {seed})")
-            br_policy = config.load_policies(device=config.eval_device)["BR"]
-            checkpoint = torch.load(br_model_file, map_location=config.eval_device)
+            checkpoint = torch.load(br_model_file, map_location=test_config.eval_device)
             br_policy.load_state_dict(checkpoint["model"])
-            br_policy.eval()
-            results = run_evaluation_episodes(br_policy, config)
+            eval_start_time = time.time()
+            results = run_evaluation_episodes(br_policy, test_config)
+            eval_time = time.time() - eval_start_time
+            print(f"Eval time: {eval_time:.2f}s")
 
             with open(results_file, "a", newline="") as f:
                 writer = csv.DictWriter(f, fieldnames=result_headers)
@@ -284,6 +306,12 @@ if __name__ == "__main__":
         help="Name of environment.",
     )
     parser.add_argument(
+        "--agent_id",
+        type=str,
+        default=None,
+        help="ID of agent.",
+    )
+    parser.add_argument(
         "--capture_video",
         type=strtobool,
         default=False,
@@ -301,4 +329,24 @@ if __name__ == "__main__":
         default=100,
         help="Number of episodes to evaluate.",
     )
-    main(parser.parse_args())
+    args = parser.parse_args()
+
+    if args.env_id == "all":
+        print("Running all envs")
+        for env_id in os.listdir(ENV_DATA_DIR):
+            if env_id == "Driving-v1":
+                continue
+            if env_id.endswith("_i0"):
+                agent_id = "i0"
+                env_id = env_id.replace("_i0", "")
+            elif env_id.endswith("_i1"):
+                agent_id = "i1"
+                env_id = env_id.replace("_i1", "")
+            else:
+                agent_id = None
+            args.env_id = env_id
+            args.agent_id = agent_id
+            print()
+            main(args)
+    else:
+        main(args)

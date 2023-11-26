@@ -9,12 +9,12 @@ from typing import TYPE_CHECKING, Dict, List, Optional, Union
 
 import numpy as np
 import torch
+from posggym.vector import SyncVectorEnv
+from posggym.wrappers import RecordEpisodeStatistics, StackEnv
+
 from posggym_baselines.config import BASE_RESULTS_DIR
 from posggym_baselines.ppo.eval import EvalFn, run_all_pairwise_evaluation
 
-
-from posggym.vector import SyncVectorEnv
-from posggym.wrappers import RecordEpisodeStatistics, StackEnv
 
 if TYPE_CHECKING:
     import gymnasium as gym
