@@ -1,22 +1,18 @@
-from __future__ import annotations
-
 import abc
-from typing import TYPE_CHECKING, Dict
+from typing import Dict, Optional
 
-
-if TYPE_CHECKING:
-    import posggym.model as M
-    from posggym.utils.history import AgentHistory
-    from posggym.agents.policy import PolicyState
+import posggym.model as M
+from posggym.agents.policy import Policy
+from posggym.utils.history import AgentHistory
+from posggym.agents.policy import PolicyState
 
 
 class SearchPolicy(abc.ABC):
     """A class for representing the search policy in MCTS planning."""
 
-    def __init__(self, model: M.POSGModel, agent_id: str, policy_id: str):
+    def __init__(self, model: M.POSGModel, agent_id: str):
         self.model = model
         self.agent_id = agent_id
-        self.policy_id = policy_id
 
     @abc.abstractmethod
     def get_initial_state(self) -> PolicyState:
@@ -32,7 +28,7 @@ class SearchPolicy(abc.ABC):
     @abc.abstractmethod
     def get_next_state(
         self,
-        action: M.ActType | None,
+        action: Optional[M.ActType],
         obs: M.ObsType,
         state: PolicyState,
     ) -> PolicyState:
@@ -155,8 +151,8 @@ class SearchPolicy(abc.ABC):
 class RandomSearchPolicy(SearchPolicy):
     """Uniform random search policy."""
 
-    def __init__(self, model: M.POSGModel, agent_id: str, policy_id: str):
-        super().__init__(model, agent_id, policy_id)
+    def __init__(self, model: M.POSGModel, agent_id: str):
+        super().__init__(model, agent_id)
         self._action_space = model.action_spaces[agent_id]
 
     def get_initial_state(self) -> PolicyState:
@@ -164,7 +160,7 @@ class RandomSearchPolicy(SearchPolicy):
 
     def get_next_state(
         self,
-        action: M.ActType | None,
+        action: Optional[M.ActType],
         obs: M.ObsType,
         state: PolicyState,
     ) -> PolicyState:
@@ -180,3 +176,36 @@ class RandomSearchPolicy(SearchPolicy):
         raise NotImplementedError(
             "RandomSearchPolicy does not support value estimates."
         )
+
+
+class SearchPolicyWrapper(SearchPolicy):
+    """Wraps a posggym.agents Policy as a SearchPolicy."""
+
+    def __init__(self, policy: Policy):
+        super().__init__(policy.model, policy.agent_id)
+        self.policy = policy
+        self.policy_id = policy.policy_id
+        self.action_space = list(range(policy.model.action_spaces[policy.agent_id].n))
+
+    def get_initial_state(self) -> PolicyState:
+        return self.policy.get_initial_state()
+
+    def get_next_state(
+        self,
+        action: Optional[M.ActType],
+        obs: M.ObsType,
+        state: PolicyState,
+    ) -> PolicyState:
+        return self.policy.get_next_state(action, obs, state)
+
+    def sample_action(self, state: PolicyState) -> M.ActType:
+        return self.policy.sample_action(state)
+
+    def get_pi(self, state: PolicyState) -> Dict[M.ActType, float]:
+        return self.policy.get_pi(state).probs
+
+    def get_value(self, state: PolicyState) -> float:
+        return self.policy.get_value(state)
+
+    def close(self):
+        self.policy.close()

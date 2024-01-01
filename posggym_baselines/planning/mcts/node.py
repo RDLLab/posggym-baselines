@@ -71,7 +71,7 @@ class ObsNode(Node):
         action_node = ActionNode(
             parent=self,
             action=action,
-            prob=self.action_probs[action],
+            prob=self.action_probs.get(action, 0.0),
             t=self.t,
             init_value=0.0,
             init_visits=0,

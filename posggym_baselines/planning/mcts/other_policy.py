@@ -1,22 +1,17 @@
-from __future__ import annotations
-
 import abc
-from typing import TYPE_CHECKING
+from typing import Optional
 
-
-if TYPE_CHECKING:
-    import posggym.model as M
-    from posggym.utils.history import AgentHistory
-    from posggym.agents.policy import PolicyState
+import posggym.model as M
+from posggym.utils.history import AgentHistory
+from posggym.agents.policy import PolicyState
 
 
 class OtherAgentPolicy(abc.ABC):
     """A class for representing the policy of the other agent in the MCTS planning."""
 
-    def __init__(self, model: M.POSGModel, agent_id: str, policy_id: str):
+    def __init__(self, model: M.POSGModel, agent_id: str):
         self.model = model
         self.agent_id = agent_id
-        self.policy_id = policy_id
 
     @abc.abstractmethod
     def sample_initial_state(self) -> PolicyState:
@@ -32,7 +27,7 @@ class OtherAgentPolicy(abc.ABC):
     @abc.abstractmethod
     def get_next_state(
         self,
-        action: M.ActType | None,
+        action: Optional[M.ActType],
         obs: M.ObsType,
         state: PolicyState,
     ) -> PolicyState:
@@ -118,8 +113,8 @@ class OtherAgentPolicy(abc.ABC):
 class RandomOtherAgentPolicy(OtherAgentPolicy):
     """Uniform random policy."""
 
-    def __init__(self, model: M.POSGModel, agent_id: str, policy_id: str):
-        super().__init__(model, agent_id, policy_id)
+    def __init__(self, model: M.POSGModel, agent_id: str):
+        super().__init__(model, agent_id)
         self._action_space = model.action_spaces[agent_id]
 
     def sample_initial_state(self) -> PolicyState:
@@ -127,7 +122,7 @@ class RandomOtherAgentPolicy(OtherAgentPolicy):
 
     def get_next_state(
         self,
-        action: M.ActType | None,
+        action: Optional[M.ActType],
         obs: M.ObsType,
         state: PolicyState,
     ) -> PolicyState:

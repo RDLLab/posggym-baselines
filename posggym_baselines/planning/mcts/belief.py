@@ -162,7 +162,10 @@ class BeliefRejectionSampler:
                 retry_count += 1
                 continue
 
-            new_history = hp_state.history.extend(joint_action, joint_obs)
+            new_history = hp_state.history.extend(
+                tuple(joint_action[i] for i in self._model.possible_agents),
+                tuple(joint_obs[i] for i in self._model.possible_agents),
+            )
             next_policy_state = joint_update_fn(hp_state, joint_action, joint_obs)
             next_hp_state = HistoryPolicyState(
                 joint_step.state,

@@ -541,8 +541,8 @@ class POMMCP:
         if obs_node.visits == 0:
             # sample action using prior policy
             return random.choices(
-                list(obs_node.policy.keys()),
-                weights=list(obs_node.policy.values()),
+                list(obs_node.action_probs.keys()),
+                weights=list(obs_node.action_probs.values()),
                 k=1,
             )[0]
 
@@ -550,7 +550,8 @@ class POMMCP:
         prior, noise = {}, 1 / len(self.action_space)
         for a in self.action_space:
             prior[a] = (
-                obs_node.policy[a] * (1 - self.config.root_exploration_fraction) + noise
+                obs_node.action_probs[a] * (1 - self.config.root_exploration_fraction)
+                + noise
             )
 
         sqrt_n = math.sqrt(obs_node.visits)
@@ -695,7 +696,7 @@ class POMMCP:
         obs: M.ObsType,
         init_visits: int = 0,
     ) -> ObsNode:
-        next_rollout_policy_state = self._update_policy_state(
+        next_search_policy_state = self._update_policy_state(
             parent.action,
             obs,
             self.search_policy,
@@ -707,8 +708,8 @@ class POMMCP:
             obs,
             t=parent.t + 1,
             belief=B.ParticleBelief(self._rng),
-            action_probs=self.search_policy.get_pi(next_rollout_policy_state),
-            search_policy_state=next_rollout_policy_state,
+            action_probs=self.search_policy.get_pi(next_search_policy_state),
+            search_policy_state=next_search_policy_state,
             init_value=0.0,
             init_visits=init_visits,
         )
@@ -718,16 +719,8 @@ class POMMCP:
 
     def _update_obs_node(self, obs_node: ObsNode, search_policy: Policy):
         obs_node.visits += 1
-
-        obs_node.search_policy_state = self._update_policy_state(
-            obs_node.parent.action,
-            obs_node.obs,
-            search_policy,
-            obs_node.parent.parent.search_policy_state,
-        )
-
         # Add search policy distribution to moving average policy of node
-        action_probs = self.search_policy.get_pi(obs_node.search_policy_state)
+        action_probs = search_policy.get_pi(obs_node.search_policy_state)
         for a, a_prob in action_probs.items():
             old_prob = obs_node.action_probs[a]
             obs_node.action_probs[a] += (a_prob - old_prob) / obs_node.visits
@@ -803,8 +796,14 @@ class POMMCP:
         )
 
     #######################################################
-    # Logging
+    # Logging and General methods
     #######################################################
+
+    def close(self):
+        """Do any clean-up."""
+        self.search_policy.close()
+        for policy in self.other_agent_policies.values():
+            policy.close()
 
     def _log_info(self, msg: str):
         """Log an info message."""
