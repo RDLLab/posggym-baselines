@@ -2,7 +2,6 @@ import logging
 import math
 import random
 import time
-from collections import namedtuple
 from dataclasses import dataclass, field
 from typing import Dict, Optional, Tuple, Union
 
@@ -10,50 +9,20 @@ import gymnasium as gym
 import numpy as np
 import posggym.model as M
 from posggym.agents.policy import Policy, PolicyState
-from posggym.utils.history import JointHistory
+from posggym.utils.history import AgentHistory, JointHistory
 
 import posggym_baselines.planning.belief as B
+from posggym_baselines.planning.mcts import KnownBounds, MinMaxStats
 from posggym_baselines.planning.node import ActionNode, ObsNode
 from posggym_baselines.planning.other_policy import OtherAgentPolicy
-from posggym_baselines.planning.search_policy import SearchPolicy
-
-KnownBounds = namedtuple("KnownBounds", ["min", "max"])
-
-
-class MinMaxStats:
-    """A class that holds the min-max values of the tree.
-
-    Ref: MuZero pseudocode
-    """
-
-    def __init__(self, known_bounds: Optional[KnownBounds]):
-        if known_bounds:
-            self.maximum = known_bounds.max
-            self.minimum = known_bounds.min
-        else:
-            self.maximum = -float("inf")
-            self.minimum = float("inf")
-
-    def update(self, value: float):
-        """Update min and mad values."""
-        self.maximum = max(self.maximum, value)
-        self.minimum = min(self.minimum, value)
-
-    def normalize(self, value: float) -> float:
-        """Normalize value given known min and max values."""
-        if self.maximum > self.minimum:
-            # Normalize only when we have set the maximum and minimum values.
-            return (value - self.minimum) / (self.maximum - self.minimum)
-        return value
-
-    def __str__(self):
-        return f"MinMaxState: (minimum: {self.minimum}, maximum: {self.maximum})"
+from posggym_baselines.planning.search_policy import RandomSearchPolicy, SearchPolicy
 
 
 @dataclass
-class POMMCPConfig:
+class INTMCPConfig:
     """Configuration for POMMCP."""
 
+    nesting_level: int
     discount: float
     search_time_limit: float
     c: float
@@ -70,8 +39,10 @@ class POMMCPConfig:
     num_particles: int = field(init=False)
     extra_particles: int = field(init=False)
     depth_limit: int = field(init=False)
+    per_level_search_time_limit: float = field(init=False)
 
     def __post_init__(self):
+        assert self.nesting_level >= 0
         assert self.discount >= 0.0 and self.discount <= 1.0
         assert self.search_time_limit > 0.0
         assert self.c > 0.0
@@ -95,11 +66,19 @@ class POMMCPConfig:
                 math.log(self.epsilon) / math.log(self.discount)
             )
 
+        self.per_level_search_time_limit = self.search_time_limit / (
+            self.nesting_level + 1
+        )
 
-class POMMCP:
-    """Partially Observable Multi-Agent Monte-Carlo Planning.
 
-    The is the base class for the various MCTS based algorithms.
+class INTMCP:
+    """Interactive Nested Tree Monte-Carlo Planning (I-NTMCP).
+
+    I-NTMCP models the problem as an I-POMDP and uses MCTS to generate the policy at
+    each nesting level. I-NTMCP is equivelent to CI-I-POMCP when the lower level models
+    are solved via MCTS, and assuming no explicit communication (communication can still
+    occur via actions and observations but it is not explicitly modelled as seperate
+    actions and observations).
 
     """
 
@@ -107,22 +86,34 @@ class POMMCP:
         self,
         model: M.POSGModel,
         agent_id: str,
-        config: POMMCPConfig,
-        other_agent_policies: Dict[str, OtherAgentPolicy],
-        search_policy: SearchPolicy,
+        config: INTMCPConfig,
+        nesting_level: int,
+        other_agent_policies: Optional[Dict[str, "INTMCP"]],
+        search_policies: Dict[str, SearchPolicy],
     ):
+        if other_agent_policies is None:
+            other_agent_policies = {}
+
         self.model = model
         self.agent_id = agent_id
         self.config = config
+        self.nesting_level = nesting_level
         self.num_agents = len(model.possible_agents)
-        assert len(other_agent_policies) == self.num_agents - 1
+
+        assert nesting_level == 0 or len(other_agent_policies) == self.num_agents - 1
         assert agent_id not in other_agent_policies
         self.other_agent_policies = other_agent_policies
-        self.search_policy = search_policy
 
-        assert isinstance(model.action_spaces[agent_id], gym.spaces.Discrete)
-        num_actions = model.action_spaces[agent_id].n
-        self.action_space = list(range(num_actions))
+        assert all(i in search_policies for i in model.possible_agents)
+        self.search_policies = search_policies
+
+        assert all(
+            isinstance(model.action_spaces[i], gym.spaces.Discrete)
+            for i in model.possible_agents
+        )
+        self.action_spaces = {
+            i: list(range(model.action_spaces[i].n)) for i in model.possible_agents
+        }
 
         self._min_max_stats = MinMaxStats(config.known_bounds)
         self._rng = random.Random(config.seed)
@@ -154,9 +145,10 @@ class POMMCP:
             t=0,
             belief=B.ParticleBelief(self._rng),
             action_probs={None: 1.0},
-            search_policy_state=self.search_policy.get_initial_state(),
+            search_policy_state=self.search_policies[self.agent_id].get_initial_state(),
         )
         self._last_action = None
+        self.history = AgentHistory.get_init_history(obs=None)
 
         self._step_num = 0
         self._statistics: Dict[str, float] = {}
@@ -169,8 +161,9 @@ class POMMCP:
     #######################################################
 
     def step(self, obs: M.ObsType) -> M.ActType:
-        assert self.step_limit is None or self.root.t <= self.step_limit
-        if self.root.is_absorbing:
+        root = self.traverse(self.history)
+        assert self.step_limit is None or root.t <= self.step_limit
+        if root.is_absorbing:
             for k in self._statistics:
                 self._statistics[k] = np.nan
             return self._last_action
@@ -183,7 +176,22 @@ class POMMCP:
         self._last_action = self.get_action()
         self._step_num += 1
 
+        self._statistics.update(self._collect_nested_statistics())
+
         return self._last_action
+
+    def _collect_nested_statistics(self) -> Dict:
+        # This functions adds up statistics of each NST in the hierarchy
+        # Only adds statistics that are collected at each level, so doesn't
+        # add up 'search_time' or 'update_time' which are only collected
+        # in the top tree
+        stats = {"reinvigoration_time": self._statistics["reinvigoration_time"]}
+        if self.nesting_level > 0:
+            for pi in self.other_agent_policies.values():
+                nested_stats = pi._collect_nested_statistics()
+                for key in stats:
+                    stats[key] += nested_stats[key]
+        return stats
 
     #######################################################
     # RESET
@@ -193,7 +201,6 @@ class POMMCP:
         self._log_info("Reset")
         self._step_num = 0
         self._min_max_stats = MinMaxStats(self.config.known_bounds)
-        self._reset_step_statistics()
 
         self.root = ObsNode(
             parent=None,
@@ -201,9 +208,15 @@ class POMMCP:
             t=0,
             belief=B.ParticleBelief(self._rng),
             action_probs={None: 1.0},
-            search_policy_state=self.search_policy.get_initial_state(),
+            search_policy_state=self.search_policies[self.agent_id].get_initial_state(),
         )
         self._last_action = None
+        self.history = AgentHistory.get_init_history(obs=None)
+
+        for pi in self.other_agent_policies.values():
+            pi.reset()
+
+        self._reset_step_statistics()
 
     def _reset_step_statistics(self):
         self._statistics = {
@@ -224,176 +237,268 @@ class POMMCP:
     #######################################################
 
     def update(self, action: M.ActType, obs: M.ObsType):
-        self._log_info(f"Step {self.root.t} update for a={action} o={obs}")
-        if self.root.is_absorbing:
+        root = self.traverse(self.history)
+        self._log_info(f"Step {root.t} update for a={action} o={obs}")
+        if root.is_absorbing:
             return
 
         start_time = time.time()
-        if self.root.t == 0:
-            self._last_action = None
-            self._initial_update(obs)
+        if root.t == 0:
+            self.history = AgentHistory.get_init_history(obs)
+            self._initial_nested_update({self.history: 1.0})
         else:
-            self._update(action, obs)
+            self.history = self.history.extend(action, obs)
+            self._nested_update({self.history: 1.0}, len(self.history.history))
 
         update_time = time.time() - start_time
         self._statistics["update_time"] = update_time
         self._log_info(f"Update time = {update_time:.4f}s")
 
-    def _initial_update(self, init_obs: M.ObsType):
-        action_node = self.root.add_child(None)
-        obs_node = self._add_obs_node(action_node, init_obs, init_visits=0)
-
+    def _initial_nested_update(self, history_dist: Dict[AgentHistory, float]):
         try:
             # check if model has implemented get_agent_initial_belief
+            hist = next(iter(history_dist))
+            _, init_obs = hist.get_last_step()
             self.model.sample_agent_initial_state(self.agent_id, init_obs)
             rejection_sample = False
         except NotImplementedError:
             rejection_sample = True
 
-        hps_b0 = B.ParticleBelief(self._rng)
+        # policy state is purely function of joint history
         init_actions = {i: None for i in self.model.possible_agents}
-        while hps_b0.size() < self.config.num_particles + self.config.extra_particles:
-            # do rejection sampling from initial belief with initial obs
-            if rejection_sample:
-                state = self.model.sample_initial_state()
-                joint_obs = self.model.sample_initial_obs(state)
-                if joint_obs[self.agent_id] != init_obs:
-                    continue
-            else:
-                state = self.model.sample_agent_initial_state(self.agent_id, init_obs)
-                joint_obs = self.model.sample_initial_obs(state)
-                joint_obs[self.agent_id] = init_obs
+        for hist, h_prob in history_dist.items():
+            h_node = self.traverse(hist)
+            _, init_obs = hist.get_last_step()
 
-            if self.config.state_belief_only:
-                joint_history = None
-                policy_state = None
-            else:
+            hps_b0 = B.ParticleBelief(self._rng)
+            while hps_b0.size() < (
+                h_prob * (self.config.num_particles + self.config.extra_particles)
+            ):
+                if rejection_sample:
+                    state = self.model.sample_initial_state()
+                    joint_obs = self.model.sample_initial_obs(state)
+                    if joint_obs[self.agent_id] != init_obs:
+                        continue
+                else:
+                    state = self.model.sample_agent_initial_state(
+                        self.agent_id, init_obs
+                    )
+                    joint_obs = self.model.sample_initial_obs(state)
+                    joint_obs[self.agent_id] = init_obs
+
                 joint_history = JointHistory.get_init_history(
                     self.model.possible_agents, joint_obs
                 )
+
+                # store search policy state for each other agent
+                # this is used during rollouts and belief reinvigoration
+                # TODO remove this if using truncated search?
                 policy_state = {
-                    j: self.other_agent_policies[j].sample_initial_state()
+                    j: self.search_policies[j].get_initial_state()
                     for j in self.model.possible_agents
                     if j != self.agent_id
                 }
-                policy_state = self._update_other_agent_policies(
+                policy_state = self._update_other_agent_search_policies(
                     init_actions, joint_obs, policy_state
                 )
 
-            hps_b0.add_particle(
-                B.HistoryPolicyState(
-                    state,
-                    joint_history,
-                    policy_state,
-                    t=1,
+                hps_b0.add_particle(
+                    B.HistoryPolicyState(
+                        state,
+                        joint_history,
+                        policy_state,
+                        t=1,
+                    )
                 )
+            h_node.belief = hps_b0
+
+        if self.nesting_level > 0:
+            nested_histories = self.get_nested_history_dist(history_dist)
+            for i, pi in self.other_agent_policies.items():
+                pi._initial_nested_update(nested_histories[i])
+
+    def _nested_update(self, history_dist: Dict[AgentHistory, float], current_t: int):
+        self._log_debug("Pruning unused nodes from tree")
+        # traverse all nodes in tree upto current step
+        for action_node in self.root.children:
+            for obs_node in action_node.children:
+                h = AgentHistory(((action_node.action, obs_node.obs),))
+                self._prune_traverse(obs_node, h, history_dist, current_t)
+
+        self._log_debug(f"Reinvigorating beliefs for num_histories={len(history_dist)}")
+        target_total_particles = self.config.num_particles + self.config.extra_particles
+        for hist, h_prob in history_dist.items():
+            h_node = self.traverse(hist)
+            if h_node.is_absorbing:
+                continue
+
+            action, obs = hist.get_last_step()
+            self._reinvigorate(
+                h_node,
+                action,
+                obs,
+                target_node_size=math.ceil(h_prob * target_total_particles),
             )
 
-        obs_node.belief = hps_b0
-        self.root = obs_node
-        self.root.parent = None
+        if self.nesting_level > 0:
+            nested_histories = self.get_nested_history_dist(history_dist)
+            for i, pi in self.other_agent_policies.items():
+                pi._nested_update(nested_histories[i], current_t)
 
-    def _update(self, action: M.ActType, obs: M.ObsType):
-        self._log_debug("Pruning histories")
-        # Get new root node
-        try:
-            action_node = self.root.get_child(action)
-        except AssertionError as ex:
-            if self.root.is_absorbing:
-                action_node = self.root.add_child(action)
-            else:
-                raise ex
+    def _prune_traverse(
+        self,
+        obs_node: ObsNode,
+        node_history: AgentHistory,
+        history_dist: Dict[AgentHistory, float],
+        current_t: int,
+    ):
+        """Recursively Traverse and prune histories from tree"""
+        if len(node_history.history) == current_t:
+            if node_history not in history_dist:
+                # pruning history
+                del obs_node
+            return
 
-        try:
-            obs_node = action_node.get_child(obs)
-        except AssertionError:
-            # Obs node not found
-            # Add obs node with uniform policy prior
-            # This will be updated in the course of doing simulations
-            obs_node = self._add_obs_node(action_node, obs, init_visits=0)
-            obs_node.is_absorbing = self.root.is_absorbing
+        for action_node in obs_node.children:
+            for child_obs_node in action_node.children:
+                history_tp1 = node_history.extend(
+                    action_node.action, child_obs_node.obs
+                )
 
-        if obs_node.is_absorbing:
-            self._log_debug("Absorbing state reached.")
-        else:
-            self._log_debug(
-                f"Belief size before reinvigoration = {obs_node.belief.size()}"
-            )
-            self._log_debug(f"Parent belief size = {self.root.belief.size()}")
-            self._reinvigorate(obs_node, action, obs)
-            self._log_debug(
-                f"Belief size after reinvigoration = {obs_node.belief.size()}"
-            )
+                if len(history_tp1.history) <= current_t - 2:
+                    # clear particles from unused nodes to reduce mem usage
+                    # nodes more than two steps behind current step are no longer used
+                    # except for traversing tree
+                    obs_node.clear_belief()
 
-        self.root = obs_node
-        # remove reference to parent, effectively pruning dead branches
-        obs_node.parent = None
+                self._prune_traverse(
+                    child_obs_node, history_tp1, history_dist, current_t
+                )
+
+    def get_nested_history_dist(
+        self,
+        histories: Dict[AgentHistory, float],
+    ) -> Dict[int, Dict[AgentHistory, float]]:
+        """Get distribution over nested histories given higher level distribution."""
+        nested_histories = {}
+        for hist, h_prob in histories.items():
+            h_node = self.traverse(hist)
+            belief_size = h_node.belief.size()
+            particles = h_node.belief.particles
+
+            for i in self.other_agent_policies:
+                if i not in nested_histories:
+                    nested_histories[i] = {}
+                nested_histories_i = nested_histories[i]
+
+                h_count = {}
+                for hps in particles:
+                    h = hps.history.get_agent_history(i)
+                    h_count[h] = h_count.get(h, 0) + 1
+
+                for h, count in h_count.items():
+                    nested_histories_i[h] = nested_histories_i.get(h, 0) + h_prob * (
+                        count / belief_size
+                    )
+
+        return nested_histories
 
     #######################################################
     # SEARCH
     #######################################################
 
     def get_action(self) -> M.ActType:
-        if self.root.is_absorbing:
+        root = self.traverse(self.history)
+        if root.is_absorbing:
             self._log_debug("Agent in absorbing state. Not running search.")
-            return self.action_space[0]
+            return self.action_spaces[self.agent_id][0]
 
         self._log_info(
             f"Searching for search_time_limit={self.config.search_time_limit}"
         )
         start_time = time.time()
 
-        if len(self.root.children) == 0:
-            for action in self.action_space:
-                self.root.add_child(action)
-
-        max_search_depth = 0
         n_sims = 0
-        while time.time() - start_time < self.config.search_time_limit:
-            hps = self.root.belief.sample()
-            _, search_depth = self._simulate(hps, self.root, 0, self.search_policy)
-            self.root.visits += 1
-            max_search_depth = max(max_search_depth, search_depth)
-            n_sims += 1
+        for level in range(self.nesting_level + 1):
+            self._log_info(f"Searching level {level=}")
+            n_sims += self._statistics["num_sims"]
+
+            level_start_time = time.time()
+            while (
+                time.time() - level_start_time < self.config.per_level_search_time_limit
+            ):
+                self._nested_sim(self.history, level, True)
+                n_sims += 1
 
         search_time = time.time() - start_time
         self._statistics["search_time"] = search_time
-        self._statistics["search_depth"] = max_search_depth
         self._statistics["num_sims"] = n_sims
         self._statistics["min_value"] = self._min_max_stats.minimum
         self._statistics["max_value"] = self._min_max_stats.maximum
-        self._log_info(f"{search_time=:.2f} {max_search_depth=}")
+        max_search_depth = self._statistics["search_depth"]
+        self._log_info(f"{search_time=:.2f} {max_search_depth=} {n_sims=}")
         if self.config.known_bounds is None:
             self._log_info(
                 f"{self._min_max_stats.minimum=:.2f} "
                 f"{self._min_max_stats.maximum=:.2f}"
             )
-        self._log_info(f"Root node policy prior = {self.root.policy_str()}")
+        self._log_info(f"Root node policy prior = {root.policy_str()}")
 
-        return self._final_action_selection(self.root)
+        return self._final_action_selection(root)
+
+    def _nested_sim(
+        self, history: AgentHistory, search_level: int, top_level: bool = False
+    ):
+        """Run nested simulation on this policy tree starting from history"""
+        self._log_debug(f"nested_sim: {search_level=}")
+
+        root = self.traverse(history)
+        if len(root.children) == 0:
+            for action in self.action_spaces[self.agent_id]:
+                root.add_child(action)
+
+        if root.belief.size() == 0 or (
+            top_level and root.belief.size() < self.config.extra_particles
+        ):
+            # handle depleted node
+            self._log_debug(f"depleted {root.belief.size()=} {top_level=}")
+            self._reinvigorate(
+                root,
+                root.parent.action,
+                root.obs,
+                target_node_size=self.config.extra_particles,
+            )
+
+        hps = root.belief.sample()
+        if self.nesting_level > search_level:
+            for i, pi in self.other_agent_policies.items():
+                pi._nested_sim(hps.history.get_agent_history(i), search_level, False)
+        else:
+            _, search_depth = self._simulate(hps, root, 0)
+            root.visits += 1
+            self._statistics["search_depth"] = max(
+                self._statistics["search_depth"], search_depth
+            )
 
     def _simulate(
         self,
         hps: B.HistoryPolicyState,
         obs_node: ObsNode,
         depth: int,
-        search_policy: Policy,
     ) -> Tuple[float, int]:
         if depth > self.config.depth_limit or (
             self.step_limit is not None and obs_node.t + depth > self.step_limit
         ):
             return 0, depth
 
-        if len(obs_node.children) == 0:
+        if len(obs_node.children) < len(self.action_spaces[self.agent_id]):
             # lead node reached
-            for action in self.action_space:
-                obs_node.add_child(action)
-            leaf_node_value = self._evaluate(
-                hps,
-                depth,
-                search_policy,
-                obs_node.search_policy_state,
-            )
+            # some child action nodes may have been added by parent tree querying
+            # so need to check if all actions have been added, and add if not
+            for action in self.action_spaces[self.agent_id]:
+                if not obs_node.has_child(action):
+                    obs_node.add_child(action)
+            leaf_node_value = self._evaluate(hps, depth, obs_node)
             return leaf_node_value, depth
 
         ego_action = self._search_action_selection(obs_node)
@@ -410,16 +515,12 @@ class POMMCP:
             or joint_step.all_done
         )
 
-        if self.config.state_belief_only:
-            new_history = None
-            next_pi_state = None
-        else:
-            new_history = hps.history.extend(joint_action, joint_obs)
-            next_pi_state = self._update_other_agent_policies(
-                joint_action, joint_obs, hps.policy_state
-            )
+        new_joint_history = hps.history.extend(joint_action, joint_obs)
+        next_pi_state = self._update_other_agent_search_policies(
+            joint_action, joint_obs, hps.policy_state
+        )
         next_hps = B.HistoryPolicyState(
-            joint_step.state, new_history, next_pi_state, hps.t + 1
+            joint_step.state, new_joint_history, next_pi_state, hps.t + 1
         )
 
         action_node = obs_node.get_child(ego_action)
@@ -427,13 +528,17 @@ class POMMCP:
         if action_node.has_child(ego_obs):
             child_obs_node = action_node.get_child(ego_obs)
             child_obs_node.visits += 1
-            # Add search policy distribution to moving average policy of node
-            action_probs = search_policy.get_pi(child_obs_node.search_policy_state)
-            for a, a_prob in action_probs.items():
-                old_prob = child_obs_node.action_probs[a]
-                child_obs_node.action_probs[a] += (
-                    a_prob - old_prob
-                ) / child_obs_node.visits
+
+            if self.config.action_selection == "pucb":
+                # Add search policy distribution to moving average policy of node
+                action_probs = self.search_policies[self.agent_id].get_pi(
+                    child_obs_node.search_policy_state
+                )
+                for a, a_prob in action_probs.items():
+                    old_prob = child_obs_node.action_probs[a]
+                    child_obs_node.action_probs[a] += (
+                        a_prob - old_prob
+                    ) / child_obs_node.visits
         else:
             child_obs_node = self._add_obs_node(action_node, ego_obs, init_visits=1)
         child_obs_node.is_absorbing = ego_done
@@ -442,7 +547,7 @@ class POMMCP:
         max_depth = depth
         if not ego_done:
             future_return, max_depth = self._simulate(
-                next_hps, child_obs_node, depth + 1, search_policy
+                next_hps, child_obs_node, depth + 1
             )
             ego_return += self.config.discount * future_return
 
@@ -454,14 +559,17 @@ class POMMCP:
         self,
         hps: B.HistoryPolicyState,
         depth: int,
-        rollout_policy: Policy,
-        rollout_policy_state: PolicyState,
+        obs_node: ObsNode,
     ) -> float:
         start_time = time.time()
         if self.config.truncated:
-            v = rollout_policy.get_value(rollout_policy_state)
+            v = self.search_policies[self.agent_id].get_value(
+                obs_node.search_policy_state
+            )
         else:
-            v = self._rollout(hps, depth, rollout_policy, rollout_policy_state)
+            search_policy_states = dict(hps.policy_state)
+            search_policy_states[self.agent_id] = obs_node.search_policy_state
+            v = self._rollout(hps, depth, self.search_policies, search_policy_states)
         self._statistics["evaluation_time"] += time.time() - start_time
         return v
 
@@ -469,16 +577,18 @@ class POMMCP:
         self,
         hps: B.HistoryPolicyState,
         depth: int,
-        rollout_policy: Policy,
-        rollout_policy_state: PolicyState,
+        rollout_policies: Dict[str, Policy],
+        rollout_policies_states: Dict[str, PolicyState],
     ) -> float:
         if depth > self.config.depth_limit or (
             self.step_limit is not None and hps.t > self.step_limit
         ):
             return 0
 
-        ego_action = rollout_policy.sample_action(rollout_policy_state)
-        joint_action = self._get_joint_action(hps, ego_action)
+        joint_action = {
+            i: rollout_policies[i].sample_action(rollout_policies_states[i])
+            for i in self.model.possible_agents
+        }
 
         joint_step = self.model.step(hps.state, joint_action)
         joint_obs = joint_step.observations
@@ -491,27 +601,26 @@ class POMMCP:
         ):
             return reward
 
-        if self.config.state_belief_only:
-            new_history = None
-            next_pi_state = None
-        else:
-            new_history = hps.history.extend(joint_action, joint_obs)
-            next_pi_state = self._update_other_agent_policies(
-                joint_action, joint_obs, hps.policy_state
-            )
+        next_pi_state = self._update_other_agent_search_policies(
+            joint_action, joint_obs, hps.policy_state
+        )
+        # history is None as it is not used during rollouts
         next_hps = B.HistoryPolicyState(
-            joint_step.state, new_history, next_pi_state, hps.t + 1
+            joint_step.state, None, next_pi_state, hps.t + 1
         )
 
-        next_rollout_policy_state = self._update_policy_state(
-            joint_action[self.agent_id],
-            joint_obs[self.agent_id],
-            rollout_policy,
-            rollout_policy_state,
-        )
+        next_rollout_policies_states = {
+            i: self._update_policy_state(
+                joint_action[i],
+                joint_obs[i],
+                rollout_policies[i],
+                rollout_policies_states[i],
+            )
+            for i in self.model.possible_agents
+        }
 
         future_return = self._rollout(
-            next_hps, depth + 1, rollout_policy, next_rollout_policy_state
+            next_hps, depth + 1, rollout_policies, next_rollout_policies_states
         )
         return reward + self.config.discount * future_return
 
@@ -530,7 +639,7 @@ class POMMCP:
         self._statistics["policy_calls"] += 1
         return next_hidden_state
 
-    def _update_other_agent_policies(
+    def _update_other_agent_search_policies(
         self,
         joint_action: Dict[str, Optional[M.ActType]],
         joint_obs: Dict[str, M.ObsType],
@@ -544,7 +653,7 @@ class POMMCP:
                 h_t = self._update_policy_state(
                     joint_action[i],
                     joint_obs[i],
-                    self.other_agent_policies[i],
+                    self.search_policies[i],
                     pi_state[i],
                 )
             next_policy_state[i] = h_t
@@ -565,8 +674,8 @@ class POMMCP:
             )[0]
 
         # add exploration noise to prior
-        prior, noise = {}, 1 / len(self.action_space)
-        for a in self.action_space:
+        prior, noise = {}, 1 / len(self.action_spaces[self.agent_id])
+        for a in self.action_space[self.agent_id]:
             prior[a] = (
                 obs_node.action_probs[a] * (1 - self.config.root_exploration_fraction)
                 + noise
@@ -594,7 +703,7 @@ class POMMCP:
     def ucb_action_selection(self, obs_node: ObsNode) -> M.ActType:
         """Select action from node using UCB."""
         if obs_node.visits == 0:
-            return random.choice(self.action_space)
+            return random.choice(self.action_spaces[self.agent_id])
 
         log_n = math.log(obs_node.visits)
 
@@ -617,7 +726,7 @@ class POMMCP:
         during search.
         """
         if obs_node.visits == 0:
-            return random.choice(self.action_space)
+            return random.choice(self.action_spaces[self.agent_id])
 
         min_n = obs_node.visits + 1
         next_action = obs_node.children[0].action
@@ -633,7 +742,7 @@ class POMMCP:
         Breaks ties randomly.
         """
         if obs_node.visits == 0:
-            return random.choice(self.action_space)
+            return random.choice(self.action_spaces[self.agent_id])
 
         max_actions = []
         max_visits = 0
@@ -652,7 +761,7 @@ class POMMCP:
         """
         if len(obs_node.children) == 0:
             # Node not expanded so select random action
-            return random.choice(self.action_space)
+            return random.choice(self.action_spaces[self.agent_id])
 
         max_actions = []
         max_value = -float("inf")
@@ -671,45 +780,62 @@ class POMMCP:
         for i in self.model.possible_agents:
             if i == self.agent_id:
                 a_i = ego_action
-            elif self.config.state_belief_only:
+            elif self.nesting_level == 0 or self.config.state_belief_only:
                 # assume other agents policies are stateless, i.e. Random
-                a_i = self.other_agent_policies[i].sample_action({})
+                a_i = self._rng.choice(self.action_spaces[i])
             else:
-                a_i = self.other_agent_policies[i].sample_action(hps.policy_state[i])
+                a_i = self.other_agent_policies[i].sample_action(
+                    hps.history.get_agent_history(i),
+                    self.search_policies[i],
+                    hps.policy_state[i],
+                )
             agent_actions[i] = a_i
         return agent_actions
 
-    def get_pi(self) -> Dict[M.ActType, float]:
-        """Get agent's distribution over actions at root of tree.
+    def sample_action(
+        self,
+        history: AgentHistory,
+        search_policy: SearchPolicy,
+        search_policy_state: PolicyState,
+    ) -> M.ActType:
+        """Sample an action from policy given history
 
-        Returns the softmax distribution over actions with temperature=1.0.
-        This is used as it incorporates uncertainty based on visit counts for
-        a given history.
+        Samples using softmax function (with temperature=1.0) scaled based on sqrt of
+        total number of visits of obs_node.
+
+        Uses `search_policy` to sample action if there is no node in the tree
+        corresponding to the given history.
+
         """
-        if self.root.n == 0 or len(self.root.children) == 0:
-            # uniform policy
-            num_actions = len(self.action_space)
-            pi = {a: 1.0 / num_actions for a in self.action_space}
-            return pi
+        obs_node = self.traverse(history)
+        if obs_node.visits == 0 or len(obs_node.children) == 0:
+            return search_policy.sample_action(search_policy_state)
 
-        obs_n_sqrt = math.sqrt(self.root.n)
-        temp = 1.0
-        pi = {
-            a_node.h: math.exp(a_node.n**temp / obs_n_sqrt)
-            for a_node in self.root.children
-        }
+        obs_n_sqrt = math.sqrt(obs_node.visits)
+        a_probs = [math.exp(a_node.visits / obs_n_sqrt) for a_node in obs_node.children]
+        a_probs_sum = sum(a_probs)
+        a_probs = [p / a_probs_sum for p in a_probs]
 
-        a_probs_sum = sum(pi.values())
-        for a in self.action_space:
-            if a not in pi:
-                pi[a] = 0.0
-            pi[a] /= a_probs_sum
-
-        return pi
+        action_node = random.choices(obs_node.children, weights=a_probs)[0]
+        return action_node.action
 
     #######################################################
     # GENERAL METHODS
     #######################################################
+
+    def traverse(self, history: AgentHistory) -> ObsNode:
+        """Traverse policy tree and return node corresponding to history."""
+        obs_node = self.root
+        for a, o in history:
+            try:
+                action_node = obs_node.get_child(a)
+            except AssertionError:
+                action_node = obs_node.add_child(a)
+            try:
+                obs_node = action_node.get_child(o)
+            except AssertionError:
+                obs_node = self._add_obs_node(action_node, o, init_visits=0)
+        return obs_node
 
     def _add_obs_node(
         self,
@@ -717,10 +843,11 @@ class POMMCP:
         obs: M.ObsType,
         init_visits: int = 0,
     ) -> ObsNode:
+        search_policy = self.search_policies[self.agent_id]
         next_search_policy_state = self._update_policy_state(
             parent.action,
             obs,
-            self.search_policy,
+            search_policy,
             parent.parent.search_policy_state,
         )
 
@@ -729,7 +856,7 @@ class POMMCP:
             obs,
             t=parent.t + 1,
             belief=B.ParticleBelief(self._rng),
-            action_probs=self.search_policy.get_pi(next_search_policy_state),
+            action_probs=search_policy.get_pi(next_search_policy_state),
             search_policy_state=next_search_policy_state,
             init_value=0.0,
             init_visits=init_visits,
@@ -796,7 +923,22 @@ class POMMCP:
     def _reinvigorate_action_fn(
         self, hps: B.HistoryPolicyState, ego_action: M.ActType
     ) -> Dict[str, M.ActType]:
-        return self._get_joint_action(hps, ego_action)
+        # sample actions using search policy for each agent, rather than using
+        # nested tree
+        joint_action = {}
+        for i in self.model.possible_agents:
+            if i == self.agent_id:
+                joint_action[i] = ego_action
+            elif self.nesting_level == 0 or self.config.state_belief_only:
+                # assume other agents policies are stateless, i.e. Random
+                joint_action[i] = self._rng.choice(self.action_spaces[i])
+            else:
+                joint_action[i] = self.other_agent_policies[i].sample_action(
+                    hps.history.get_agent_history(i),
+                    self.search_policies[i],
+                    hps.policy_state[i],
+                )
+        return joint_action
 
     def _reinvigorate_update_fn(
         self,
@@ -804,7 +946,7 @@ class POMMCP:
         joint_action: Dict[str, M.ActType],
         joint_obs: Dict[str, M.ObsType],
     ) -> Dict[str, PolicyState]:
-        return self._update_other_agent_policies(
+        return self._update_other_agent_search_policies(
             joint_action, joint_obs, hps.policy_state
         )
 
@@ -814,13 +956,14 @@ class POMMCP:
 
     def close(self):
         """Do any clean-up."""
-        self.search_policy.close()
+        for policy in self.search_policies.values():
+            policy.close()
         for policy in self.other_agent_policies.values():
             policy.close()
 
     def _log_info(self, msg: str):
         """Log an info message."""
-        self._logger.log(logging.INFO - 1, self._format_msg(msg))
+        self._logger.info(self._format_msg(msg))
 
     def _log_debug(self, msg: str):
         """Log a debug message."""
@@ -831,3 +974,50 @@ class POMMCP:
 
     def __str__(self):
         return f"{self.__class__.__name__}"
+
+    @classmethod
+    def initialize(
+        cls,
+        model: M.POSGModel,
+        ego_agent_id: str,
+        config: INTMCPConfig,
+        nesting_level: int,
+        search_policies: Optional[Dict[int, Dict[str, SearchPolicy]]],
+    ) -> "INTMCP":
+        """Initialize a new I-NTMCP datastructure
+
+        Includes recursively initializing all sub trees.
+
+        If `search_policies` is None then a RandomSearchPolicy is used for each agent.
+
+        """
+        if search_policies is None:
+            search_policies = {}
+            for level in range(nesting_level + 1):
+                search_policies[level] = {}
+                for i in model.possible_agents:
+                    search_policies[level][i] = RandomSearchPolicy(model, i)
+
+        other_agent_policies = {}
+        if nesting_level > 0:
+            for i in model.possible_agents:
+                if i == ego_agent_id:
+                    continue
+
+                other_agent_policies[i] = INTMCP.initialize(
+                    model=model,
+                    ego_agent_id=i,
+                    config=config,
+                    nesting_level=nesting_level - 1,
+                    search_policies=search_policies,
+                )
+
+        intmcp = INTMCP(
+            model=model,
+            agent_id=ego_agent_id,
+            config=config,
+            nesting_level=nesting_level,
+            other_agent_policies=other_agent_policies,
+            search_policies=search_policies[nesting_level],
+        )
+        return intmcp

@@ -2,9 +2,8 @@ import abc
 from typing import Dict, Optional
 
 import posggym.model as M
-from posggym.agents.policy import Policy
+from posggym.agents.policy import Policy, PolicyState
 from posggym.utils.history import AgentHistory
-from posggym.agents.policy import PolicyState
 
 
 class SearchPolicy(abc.ABC):

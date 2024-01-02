@@ -2,6 +2,7 @@ results
 wandb
 baseline_exps/saved_br_models
 *.svg
+.vscode
 
 
 # Byte-compiled / optimized / DLL files

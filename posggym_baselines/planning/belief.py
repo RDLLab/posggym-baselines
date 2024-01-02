@@ -1,10 +1,9 @@
 import random
-from typing import List, Optional, Dict, Callable, TypeVar, Generic
+from typing import Callable, Dict, Generic, List, Optional, TypeVar
 
 import posggym.model as M
-from posggym.utils.history import JointHistory
 from posggym.agents.policy import PolicyState
-
+from posggym.utils.history import JointHistory
 
 ParticleType = TypeVar("ParticleType")
 
@@ -170,17 +169,14 @@ class BeliefRejectionSampler:
                 continue
 
             if self._state_belief_only:
-                new_history = None
+                new_joint_history = None
                 next_policy_state = None
             else:
-                new_history = hps.history.extend(
-                    tuple(joint_action[i] for i in self._model.possible_agents),
-                    tuple(joint_obs[i] for i in self._model.possible_agents),
-                )
+                new_joint_history = hps.history.extend(joint_action, joint_obs)
                 next_policy_state = joint_update_fn(hps, joint_action, joint_obs)
             next_hps = HistoryPolicyState(
                 joint_step.state,
-                new_history,
+                new_joint_history,
                 next_policy_state,
                 hps.t + 1,
             )

@@ -1,10 +1,10 @@
 import abc
 import random
-from typing import Optional, Dict, List
+from typing import Dict, List, Optional
 
 import posggym.model as M
-from posggym.utils.history import AgentHistory
 from posggym.agents.policy import Policy, PolicyState
+from posggym.utils.history import AgentHistory
 
 
 class OtherAgentPolicy(abc.ABC):

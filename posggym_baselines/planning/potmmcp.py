@@ -1,20 +1,17 @@
 import math
 import random
 import time
-from typing import Optional, Dict, Tuple
+from typing import Dict, Optional, Tuple
 
 import posggym.model as M
+from posggym.agents.policy import Policy, PolicyState
 from posggym.utils.history import JointHistory
-from posggym.agents.policy import PolicyState, Policy
 
 import posggym_baselines.planning.belief as B
 from posggym_baselines.planning.mcts import POMMCP, POMMCPConfig
 from posggym_baselines.planning.node import ObsNode
 from posggym_baselines.planning.other_policy import OtherAgentPolicy
-from posggym_baselines.planning.search_policy import (
-    SearchPolicy,
-    SearchPolicyWrapper,
-)
+from posggym_baselines.planning.search_policy import SearchPolicy, SearchPolicyWrapper
 
 
 class POTMMCP(POMMCP):
@@ -80,7 +77,7 @@ class POTMMCP(POMMCP):
                 joint_obs[self.agent_id] = init_obs
 
             joint_history = JointHistory.get_init_history(
-                self.num_agents, tuple(joint_obs[i] for i in self.model.possible_agents)
+                self.model.possible_agents, joint_obs
             )
             other_agent_policy_state = {
                 j: self.other_agent_policies[j].sample_initial_state()
@@ -95,6 +92,7 @@ class POTMMCP(POMMCP):
                     state,
                     joint_history,
                     other_agent_policy_state,
+                    t=1,
                 )
             )
 
@@ -245,14 +243,13 @@ class POTMMCP(POMMCP):
             or joint_step.all_done
         )
 
-        new_history = hps.history.extend(
-            tuple(joint_action[i] for i in self.model.possible_agents),
-            tuple(joint_obs[i] for i in self.model.possible_agents),
-        )
+        new_joint_history = hps.history.extend(joint_action, joint_obs)
         next_pi_state = self._update_other_agent_policies(
             joint_action, joint_obs, hps.policy_state
         )
-        next_hps = B.HistoryPolicyState(joint_step.state, new_history, next_pi_state)
+        next_hps = B.HistoryPolicyState(
+            joint_step.state, new_joint_history, next_pi_state, hps.t + 1
+        )
 
         action_node = obs_node.get_child(ego_action)
 
