@@ -1,6 +1,7 @@
 results
 wandb
 baseline_exps/saved_br_models
+*.svg
 
 
 # Byte-compiled / optimized / DLL files
