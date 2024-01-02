@@ -4,7 +4,7 @@ from typing import Dict, List, Optional
 import posggym.model as M
 from posggym.agents.policy import PolicyState
 
-from posggym_baselines.planning.mcts.belief import ParticleBelief
+from posggym_baselines.planning.belief import ParticleBelief
 
 
 class Node:

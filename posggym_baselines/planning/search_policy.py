@@ -1,21 +1,22 @@
 import abc
-from typing import Optional
+from typing import Dict, Optional
 
 import posggym.model as M
+from posggym.agents.policy import Policy
 from posggym.utils.history import AgentHistory
 from posggym.agents.policy import PolicyState
 
 
-class OtherAgentPolicy(abc.ABC):
-    """A class for representing the policy of the other agent in the MCTS planning."""
+class SearchPolicy(abc.ABC):
+    """A class for representing the search policy in MCTS planning."""
 
     def __init__(self, model: M.POSGModel, agent_id: str):
         self.model = model
         self.agent_id = agent_id
 
     @abc.abstractmethod
-    def sample_initial_state(self) -> PolicyState:
-        """Get an initial state of the policy.
+    def get_initial_state(self) -> PolicyState:
+        """Get initial state of the policy.
 
         Returns
         -------
@@ -73,6 +74,43 @@ class OtherAgentPolicy(abc.ABC):
 
         """
 
+    @abc.abstractmethod
+    def get_pi(self, state: PolicyState) -> Dict[M.ActType, float]:
+        """Get policy's distribution over actions for given policy state.
+
+        Subclasses must implement this method
+
+        Arguments
+        ---------
+        state : PolicyState
+            the policy's current state
+
+        Returns
+        -------
+        pi : Dict[M.ActType, float]
+            the policy's distribution over actions
+
+        """
+
+    @abc.abstractmethod
+    def get_value(self, state: PolicyState) -> float:
+        """Get a value estimate of a history.
+
+        Subclasses must implement this method, but may set it to raise a
+        NotImplementedError if the policy does not support value estimates.
+
+        Arguments
+        ---------
+        state : PolicyState
+            the policy's current state
+
+        Returns
+        -------
+        value : float
+            the value estimate
+
+        """
+
     def get_state_from_history(
         self, initial_state: PolicyState, history: AgentHistory
     ) -> PolicyState:
@@ -110,14 +148,14 @@ class OtherAgentPolicy(abc.ABC):
         pass
 
 
-class RandomOtherAgentPolicy(OtherAgentPolicy):
-    """Uniform random policy."""
+class RandomSearchPolicy(SearchPolicy):
+    """Uniform random search policy."""
 
     def __init__(self, model: M.POSGModel, agent_id: str):
         super().__init__(model, agent_id)
         self._action_space = model.action_spaces[agent_id]
 
-    def sample_initial_state(self) -> PolicyState:
+    def get_initial_state(self) -> PolicyState:
         return {}
 
     def get_next_state(
@@ -130,3 +168,59 @@ class RandomOtherAgentPolicy(OtherAgentPolicy):
 
     def sample_action(self, state: PolicyState) -> M.ActType:
         return self._action_space.sample()
+
+    def get_pi(self, state: PolicyState) -> Dict[M.ActType, float]:
+        return {a: 1.0 / self._action_space.n for a in range(self._action_space.n)}
+
+    def get_value(self, state: PolicyState) -> float:
+        raise NotImplementedError(
+            "RandomSearchPolicy does not support value estimates."
+        )
+
+
+class SearchPolicyWrapper(SearchPolicy):
+    """Wraps a posggym.agents Policy as a SearchPolicy."""
+
+    def __init__(self, policy: Policy):
+        super().__init__(policy.model, policy.agent_id)
+        self.policy = policy
+        self.policy_id = policy.policy_id
+        self.action_space = list(range(policy.model.action_spaces[policy.agent_id].n))
+
+    def get_initial_state(self) -> PolicyState:
+        return self.policy.get_initial_state()
+
+    def get_next_state(
+        self,
+        action: Optional[M.ActType],
+        obs: M.ObsType,
+        state: PolicyState,
+    ) -> PolicyState:
+        return self.policy.get_next_state(action, obs, state)
+
+    def sample_action(self, state: PolicyState) -> M.ActType:
+        return self.policy.sample_action(state)
+
+    def get_pi(self, state: PolicyState) -> Dict[M.ActType, float]:
+        pi = self.policy.get_pi(state).probs
+
+        if len(pi) != len(self.action_space):
+            for a in self.action_space:
+                if a not in pi:
+                    pi[a] = 0.0
+        return pi
+
+    def get_value(self, state: PolicyState) -> float:
+        return self.policy.get_value(state)
+
+    def close(self):
+        self.policy.close()
+
+
+def load_posggym_agents_search_policy(
+    model: M.POSGModel, agent_id: str, policy_id: str
+) -> "SearchPolicyWrapper":
+    import posggym.agents as pga
+
+    policy = pga.make(policy_id, model, agent_id)
+    return SearchPolicyWrapper(policy)

@@ -30,14 +30,15 @@ class HistoryPolicyState:
         state: M.StateType,
         history: JointHistory,
         policy_state: Dict[str, PolicyState],
+        t: int,
     ):
         self.state = state
         self.history = history
         self.policy_state = policy_state
-        self.t = len(history)
+        self.t = t
 
     def __str__(self):
-        return f"[s={self.state}, h={self.history}, pi={self.policy_state}]"
+        return f"[s={self.state}, h={self.history}, pi={self.policy_state}, t={self.t}]"
 
     def __repr__(self):
         return self.__str__()
@@ -75,8 +76,14 @@ class BeliefRejectionSampler:
         samples using rejection sampling (default=False)
     """
 
-    def __init__(self, model: M.POSGModel, sample_limit: int = 1000):
+    def __init__(
+        self,
+        model: M.POSGModel,
+        state_belief_only: bool = False,
+        sample_limit: int = 1000,
+    ):
         self._model = model
+        self._state_belief_only = state_belief_only
         self._sample_limit = sample_limit
 
     def reinvigorate(
@@ -153,32 +160,37 @@ class BeliefRejectionSampler:
         while sample_count < num_samples and retry_count < max(
             num_samples, self._sample_limit
         ):
-            hp_state = parent_belief.sample()
-            joint_action = joint_action_fn(hp_state, action)
-            joint_step = self._model.step(hp_state.state, joint_action)
+            hps = parent_belief.sample()
+            joint_action = joint_action_fn(hps, action)
+            joint_step = self._model.step(hps.state, joint_action)
             joint_obs = joint_step.observations
 
             if joint_obs[agent_id] != obs and not use_rejected_samples:
                 retry_count += 1
                 continue
 
-            new_history = hp_state.history.extend(
-                tuple(joint_action[i] for i in self._model.possible_agents),
-                tuple(joint_obs[i] for i in self._model.possible_agents),
-            )
-            next_policy_state = joint_update_fn(hp_state, joint_action, joint_obs)
-            next_hp_state = HistoryPolicyState(
+            if self._state_belief_only:
+                new_history = None
+                next_policy_state = None
+            else:
+                new_history = hps.history.extend(
+                    tuple(joint_action[i] for i in self._model.possible_agents),
+                    tuple(joint_obs[i] for i in self._model.possible_agents),
+                )
+                next_policy_state = joint_update_fn(hps, joint_action, joint_obs)
+            next_hps = HistoryPolicyState(
                 joint_step.state,
                 new_history,
                 next_policy_state,
+                hps.t + 1,
             )
 
             if joint_obs[agent_id] == obs:
-                samples.append(next_hp_state)
+                samples.append(next_hps)
                 sample_count += 1
             else:
                 if use_rejected_samples:
-                    rejected_samples.append(next_hp_state)
+                    rejected_samples.append(next_hps)
                 retry_count += 1
 
         if sample_count < num_samples and use_rejected_samples:

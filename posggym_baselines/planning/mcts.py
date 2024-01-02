@@ -13,10 +13,10 @@ from posggym.utils.history import JointHistory
 from posggym.agents.policy import PolicyState, Policy
 
 
-import posggym_baselines.planning.mcts.belief as B
-from posggym_baselines.planning.mcts.node import ActionNode, ObsNode
-from posggym_baselines.planning.mcts.other_policy import OtherAgentPolicy
-from posggym_baselines.planning.mcts.search_policy import SearchPolicy
+import posggym_baselines.planning.belief as B
+from posggym_baselines.planning.node import ActionNode, ObsNode
+from posggym_baselines.planning.other_policy import OtherAgentPolicy
+from posggym_baselines.planning.search_policy import SearchPolicy
 
 
 KnownBounds = namedtuple("KnownBounds", ["min", "max"])
@@ -67,6 +67,7 @@ class POMMCPConfig:
     step_limit: Optional[int] = None
     epsilon: float = 0.01
     seed: Optional[int] = None
+    state_belief_only: bool = False
 
     num_particles: int = field(init=False)
     extra_particles: int = field(init=False)
@@ -136,7 +137,7 @@ class POMMCP:
             self.step_limit = None
 
         self._reinvigorator = B.BeliefRejectionSampler(
-            model, sample_limit=4 * self.config.num_particles
+            model, config.state_belief_only, sample_limit=4 * self.config.num_particles
         )
 
         if config.action_selection == "pucb":
@@ -265,22 +266,29 @@ class POMMCP:
                 joint_obs = self.model.sample_initial_obs(state)
                 joint_obs[self.agent_id] = init_obs
 
-            joint_history = JointHistory.get_init_history(
-                self.num_agents, tuple(joint_obs[i] for i in self.model.possible_agents)
-            )
-            policy_state = {
-                j: self.other_agent_policies[j].sample_initial_state()
-                for j in self.model.possible_agents
-                if j != self.agent_id
-            }
-            policy_state = self._update_other_agent_policies(
-                init_actions, joint_obs, policy_state
-            )
+            if self.config.state_belief_only:
+                joint_history = None
+                policy_state = None
+            else:
+                joint_history = JointHistory.get_init_history(
+                    self.num_agents,
+                    tuple(joint_obs[i] for i in self.model.possible_agents),
+                )
+                policy_state = {
+                    j: self.other_agent_policies[j].sample_initial_state()
+                    for j in self.model.possible_agents
+                    if j != self.agent_id
+                }
+                policy_state = self._update_other_agent_policies(
+                    init_actions, joint_obs, policy_state
+                )
+
             hps_b0.add_particle(
                 B.HistoryPolicyState(
                     state,
                     joint_history,
                     policy_state,
+                    t=1,
                 )
             )
 
@@ -292,20 +300,20 @@ class POMMCP:
         self._log_debug("Pruning histories")
         # Get new root node
         try:
-            a_node = self.root.get_child(action)
+            action_node = self.root.get_child(action)
         except AssertionError as ex:
             if self.root.is_absorbing:
-                a_node = self.root.add_child(action)
+                action_node = self.root.add_child(action)
             else:
                 raise ex
 
         try:
-            obs_node = a_node.get_child(obs)
+            obs_node = action_node.get_child(obs)
         except AssertionError:
             # Obs node not found
             # Add obs node with uniform policy prior
             # This will be updated in the course of doing simulations
-            obs_node = self._add_obs_node(a_node, obs, init_visits=0)
+            obs_node = self._add_obs_node(action_node, obs, init_visits=0)
             obs_node.is_absorbing = self.root.is_absorbing
 
         if obs_node.is_absorbing:
@@ -405,20 +413,33 @@ class POMMCP:
             or joint_step.all_done
         )
 
-        new_history = hps.history.extend(
-            tuple(joint_action[i] for i in self.model.possible_agents),
-            tuple(joint_obs[i] for i in self.model.possible_agents),
+        if self.config.state_belief_only:
+            new_history = None
+            next_pi_state = None
+        else:
+            new_history = hps.history.extend(
+                tuple(joint_action[i] for i in self.model.possible_agents),
+                tuple(joint_obs[i] for i in self.model.possible_agents),
+            )
+            next_pi_state = self._update_other_agent_policies(
+                joint_action, joint_obs, hps.policy_state
+            )
+        next_hps = B.HistoryPolicyState(
+            joint_step.state, new_history, next_pi_state, hps.t + 1
         )
-        next_pi_state = self._update_other_agent_policies(
-            joint_action, joint_obs, hps.policy_state
-        )
-        next_hps = B.HistoryPolicyState(joint_step.state, new_history, next_pi_state)
 
         action_node = obs_node.get_child(ego_action)
 
         if action_node.has_child(ego_obs):
             child_obs_node = action_node.get_child(ego_obs)
-            self._update_obs_node(child_obs_node, search_policy)
+            child_obs_node.visits += 1
+            # Add search policy distribution to moving average policy of node
+            action_probs = search_policy.get_pi(child_obs_node.search_policy_state)
+            for a, a_prob in action_probs.items():
+                old_prob = child_obs_node.action_probs[a]
+                child_obs_node.action_probs[a] += (
+                    a_prob - old_prob
+                ) / child_obs_node.visits
         else:
             child_obs_node = self._add_obs_node(action_node, ego_obs, init_visits=1)
         child_obs_node.is_absorbing = ego_done
@@ -476,14 +497,20 @@ class POMMCP:
         ):
             return reward
 
-        new_history = hps.history.extend(
-            tuple(joint_action[i] for i in self.model.possible_agents),
-            tuple(joint_obs[i] for i in self.model.possible_agents),
+        if self.config.state_belief_only:
+            new_history = None
+            next_pi_state = None
+        else:
+            new_history = hps.history.extend(
+                tuple(joint_action[i] for i in self.model.possible_agents),
+                tuple(joint_obs[i] for i in self.model.possible_agents),
+            )
+            next_pi_state = self._update_other_agent_policies(
+                joint_action, joint_obs, hps.policy_state
+            )
+        next_hps = B.HistoryPolicyState(
+            joint_step.state, new_history, next_pi_state, hps.t + 1
         )
-        next_pi_state = self._update_other_agent_policies(
-            joint_action, joint_obs, hps.policy_state
-        )
-        next_hps = B.HistoryPolicyState(joint_step.state, new_history, next_pi_state)
 
         next_rollout_policy_state = self._update_policy_state(
             joint_action[self.agent_id],
@@ -653,6 +680,9 @@ class POMMCP:
         for i in self.model.possible_agents:
             if i == self.agent_id:
                 a_i = ego_action
+            elif self.config.state_belief_only:
+                # assume other agents policies are stateless, i.e. Random
+                a_i = self.other_agent_policies[i].sample_action({})
             else:
                 a_i = self.other_agent_policies[i].sample_action(hps.policy_state[i])
             agent_actions[i] = a_i
@@ -716,14 +746,6 @@ class POMMCP:
         parent.children.append(obs_node)
 
         return obs_node
-
-    def _update_obs_node(self, obs_node: ObsNode, search_policy: Policy):
-        obs_node.visits += 1
-        # Add search policy distribution to moving average policy of node
-        action_probs = search_policy.get_pi(obs_node.search_policy_state)
-        for a, a_prob in action_probs.items():
-            old_prob = obs_node.action_probs[a]
-            obs_node.action_probs[a] += (a_prob - old_prob) / obs_node.visits
 
     #######################################################
     # BELIEF REINVIGORATION

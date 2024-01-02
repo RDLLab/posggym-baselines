@@ -4,10 +4,9 @@ import math
 import posggym
 import posggym.agents as pga
 
-from posggym_baselines.planning.mcts.core import POMMCPConfig
-from posggym_baselines.planning.potmmcp.core import POTMMCP
-from posggym_baselines.planning.potmmcp.other_policy import POTMMCPOtherAgentPolicy
-from posggym_baselines.planning.potmmcp.search_policy import POTMMCPMetaPolicy
+from posggym_baselines.planning.mcts import POMMCPConfig
+from posggym_baselines.planning.potmmcp import POTMMCP, POTMMCPMetaPolicy
+from posggym_baselines.planning.other_policy import OtherAgentMixturePolicy
 
 
 def run_policies(env, planner, other_policy, planning_agent_id, other_agent_id):
@@ -43,6 +42,7 @@ def test_with_single_random_policies():
         step_limit=None,
         epsilon=0.92,  # depth_limit=2
         seed=0,
+        state_belief_only=False,
     )
 
     env = posggym.make(
@@ -63,7 +63,7 @@ def test_with_single_random_policies():
     search_policy = POTMMCPMetaPolicy.load_posggym_agents_meta_policy(
         env.model, planning_agent_id, meta_policy
     )
-    planner_other_policy = POTMMCPOtherAgentPolicy.load_posggym_agents_policy(
+    planner_other_policy = OtherAgentMixturePolicy.load_posggym_agents_policy(
         env.model, other_agent_id, ["Random-v0"]
     )
 
@@ -93,6 +93,7 @@ def test_with_other_policies_and_random_meta_policy():
         step_limit=None,
         epsilon=0.92,  # depth_limit=2
         seed=0,
+        state_belief_only=False,
     )
 
     env = posggym.make(
@@ -119,7 +120,7 @@ def test_with_other_policies_and_random_meta_policy():
     search_policy = POTMMCPMetaPolicy.load_posggym_agents_meta_policy(
         env.model, planning_agent_id, meta_policy
     )
-    planner_other_policy = POTMMCPOtherAgentPolicy.load_posggym_agents_policy(
+    planner_other_policy = OtherAgentMixturePolicy.load_posggym_agents_policy(
         env.model, other_agent_id, other_agent_policy_ids
     )
 
@@ -149,6 +150,7 @@ def test_with_other_policies_and_uniform_meta_policy():
         step_limit=None,
         epsilon=0.92,  # depth_limit=2
         seed=0,
+        state_belief_only=False,
     )
 
     env = posggym.make(
@@ -181,7 +183,7 @@ def test_with_other_policies_and_uniform_meta_policy():
     search_policy = POTMMCPMetaPolicy.load_posggym_agents_meta_policy(
         env.model, planning_agent_id, meta_policy
     )
-    planner_other_policy = POTMMCPOtherAgentPolicy.load_posggym_agents_policy(
+    planner_other_policy = OtherAgentMixturePolicy.load_posggym_agents_policy(
         env.model, other_agent_id, other_agent_policy_ids
     )
 
@@ -211,6 +213,7 @@ def test_with_torch_other_and_meta_policies():
         step_limit=None,
         epsilon=0.92,  # depth_limit=2
         seed=0,
+        state_belief_only=False,
     )
 
     env = posggym.make(
@@ -243,7 +246,7 @@ def test_with_torch_other_and_meta_policies():
     search_policy = POTMMCPMetaPolicy.load_posggym_agents_meta_policy(
         env.model, planning_agent_id, meta_policy
     )
-    planner_other_policy = POTMMCPOtherAgentPolicy.load_posggym_agents_policy(
+    planner_other_policy = OtherAgentMixturePolicy.load_posggym_agents_policy(
         env.model, other_agent_id, other_agent_policy_ids
     )
 

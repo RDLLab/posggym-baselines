@@ -1,22 +1,22 @@
 import abc
-from typing import Dict, Optional
+import random
+from typing import Optional, Dict, List
 
 import posggym.model as M
-from posggym.agents.policy import Policy
 from posggym.utils.history import AgentHistory
-from posggym.agents.policy import PolicyState
+from posggym.agents.policy import Policy, PolicyState
 
 
-class SearchPolicy(abc.ABC):
-    """A class for representing the search policy in MCTS planning."""
+class OtherAgentPolicy(abc.ABC):
+    """A class for representing the policy of the other agent in the MCTS planning."""
 
     def __init__(self, model: M.POSGModel, agent_id: str):
         self.model = model
         self.agent_id = agent_id
 
     @abc.abstractmethod
-    def get_initial_state(self) -> PolicyState:
-        """Get initial state of the policy.
+    def sample_initial_state(self) -> PolicyState:
+        """Get an initial state of the policy.
 
         Returns
         -------
@@ -74,43 +74,6 @@ class SearchPolicy(abc.ABC):
 
         """
 
-    @abc.abstractmethod
-    def get_pi(self, state: PolicyState) -> Dict[M.ActType, float]:
-        """Get policy's distribution over actions for given policy state.
-
-        Subclasses must implement this method
-
-        Arguments
-        ---------
-        state : PolicyState
-            the policy's current state
-
-        Returns
-        -------
-        pi : Dict[M.ActType, float]
-            the policy's distribution over actions
-
-        """
-
-    @abc.abstractmethod
-    def get_value(self, state: PolicyState) -> float:
-        """Get a value estimate of a history.
-
-        Subclasses must implement this method, but may set it to raise a
-        NotImplementedError if the policy does not support value estimates.
-
-        Arguments
-        ---------
-        state : PolicyState
-            the policy's current state
-
-        Returns
-        -------
-        value : float
-            the value estimate
-
-        """
-
     def get_state_from_history(
         self, initial_state: PolicyState, history: AgentHistory
     ) -> PolicyState:
@@ -148,14 +111,14 @@ class SearchPolicy(abc.ABC):
         pass
 
 
-class RandomSearchPolicy(SearchPolicy):
-    """Uniform random search policy."""
+class RandomOtherAgentPolicy(OtherAgentPolicy):
+    """Uniform random policy."""
 
     def __init__(self, model: M.POSGModel, agent_id: str):
         super().__init__(model, agent_id)
         self._action_space = model.action_spaces[agent_id]
 
-    def get_initial_state(self) -> PolicyState:
+    def sample_initial_state(self) -> PolicyState:
         return {}
 
     def get_next_state(
@@ -169,26 +132,34 @@ class RandomSearchPolicy(SearchPolicy):
     def sample_action(self, state: PolicyState) -> M.ActType:
         return self._action_space.sample()
 
-    def get_pi(self, state: PolicyState) -> Dict[M.ActType, float]:
-        return {a: 1.0 / self._action_space.n for a in range(self._action_space.n)}
 
-    def get_value(self, state: PolicyState) -> float:
-        raise NotImplementedError(
-            "RandomSearchPolicy does not support value estimates."
-        )
+class OtherAgentMixturePolicy(OtherAgentPolicy):
+    """Other agent mixture policy.
 
+    This policy is a distribution over a set of possible policies for the other agent.
+    Only one of the policies is active at a time (i.e. it's consistent across an
+    episode). The active policy is sampled in the `sample_initial_state` method.
 
-class SearchPolicyWrapper(SearchPolicy):
-    """Wraps a posggym.agents Policy as a SearchPolicy."""
+    Currently assumes uniform prior over policies and only 2 agents in the environment
+    (i.e. the planning agent and the other agent)
+    """
 
-    def __init__(self, policy: Policy):
-        super().__init__(policy.model, policy.agent_id)
-        self.policy = policy
-        self.policy_id = policy.policy_id
-        self.action_space = list(range(policy.model.action_spaces[policy.agent_id].n))
+    def __init__(
+        self,
+        model: M.POSGModel,
+        agent_id: str,
+        policies: Dict[str, Policy],
+    ):
+        super().__init__(model, agent_id)
+        assert len(model.possible_agents) == 2, "Currently only supports 2 agents"
+        self.policies = policies
 
-    def get_initial_state(self) -> PolicyState:
-        return self.policy.get_initial_state()
+    def sample_initial_state(self) -> PolicyState:
+        policy_id = random.choice(list(self.policies))
+        return {
+            "policy_id": policy_id,
+            "policy_state": self.policies[policy_id].get_initial_state(),
+        }
 
     def get_next_state(
         self,
@@ -196,16 +167,30 @@ class SearchPolicyWrapper(SearchPolicy):
         obs: M.ObsType,
         state: PolicyState,
     ) -> PolicyState:
-        return self.policy.get_next_state(action, obs, state)
+        policy_id = state["policy_id"]
+        policy_state = state["policy_state"]
+        next_policy_state = self.policies[policy_id].get_next_state(
+            action, obs, policy_state
+        )
+        return {"policy_id": policy_id, "policy_state": next_policy_state}
 
     def sample_action(self, state: PolicyState) -> M.ActType:
-        return self.policy.sample_action(state)
-
-    def get_pi(self, state: PolicyState) -> Dict[M.ActType, float]:
-        return self.policy.get_pi(state).probs
-
-    def get_value(self, state: PolicyState) -> float:
-        return self.policy.get_value(state)
+        policy_id = state["policy_id"]
+        policy_state = state["policy_state"]
+        return self.policies[policy_id].sample_action(policy_state)
 
     def close(self):
-        self.policy.close()
+        for policy in self.policies.values():
+            policy.close()
+
+    @staticmethod
+    def load_posggym_agents_policy(
+        model: M.POSGModel, agent_id: str, policy_ids: List[str]
+    ) -> "OtherAgentMixturePolicy":
+        import posggym.agents as pga
+
+        policies = {}
+        for policy_id in policy_ids:
+            policies[policy_id] = pga.make(policy_id, model, agent_id)
+
+        return OtherAgentMixturePolicy(model, agent_id, policies)

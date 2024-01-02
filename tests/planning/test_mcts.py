@@ -4,9 +4,9 @@ import math
 import posggym
 import posggym.agents as pga
 
-from posggym_baselines.planning.mcts.core import POMMCPConfig, POMMCP
-from posggym_baselines.planning.mcts.search_policy import RandomSearchPolicy
-from posggym_baselines.planning.mcts.other_policy import RandomOtherAgentPolicy
+from posggym_baselines.planning.mcts import POMMCPConfig, POMMCP
+from posggym_baselines.planning.search_policy import RandomSearchPolicy
+from posggym_baselines.planning.other_policy import RandomOtherAgentPolicy
 
 
 def test_with_random_policies():
@@ -22,6 +22,7 @@ def test_with_random_policies():
         step_limit=None,
         epsilon=0.92,  # depth_limit=2
         seed=0,
+        state_belief_only=False,
     )
 
     env = posggym.make(
