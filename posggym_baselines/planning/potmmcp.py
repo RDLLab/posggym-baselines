@@ -8,20 +8,21 @@ from posggym.agents.policy import Policy, PolicyState
 from posggym.utils.history import JointHistory
 
 import posggym_baselines.planning.belief as B
-from posggym_baselines.planning.mcts import POMMCP, POMMCPConfig
+from posggym_baselines.planning.config import MCTSConfig
+from posggym_baselines.planning.mcts import MCTS
 from posggym_baselines.planning.node import ObsNode
 from posggym_baselines.planning.other_policy import OtherAgentPolicy
 from posggym_baselines.planning.search_policy import SearchPolicy, SearchPolicyWrapper
 
 
-class POTMMCP(POMMCP):
+class POTMMCP(MCTS):
     """Partially Observable Type-Based Multi-Agent Monte-Carlo Planning."""
 
     def __init__(
         self,
         model: M.POSGModel,
         agent_id: str,
-        config: POMMCPConfig,
+        config: MCTSConfig,
         other_agent_policies: Dict[str, OtherAgentPolicy],
         search_policy: "POTMMCPMetaPolicy",
     ):

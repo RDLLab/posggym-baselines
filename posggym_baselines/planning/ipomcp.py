@@ -1,11 +1,12 @@
 import posggym.model as M
 
-from posggym_baselines.planning.mcts import POMMCP, POMMCPConfig
+from posggym_baselines.planning.config import MCTSConfig
+from posggym_baselines.planning.mcts import MCTS
 from posggym_baselines.planning.other_policy import OtherAgentPolicy
 from posggym_baselines.planning.search_policy import SearchPolicy
 
 
-class IPOMCP(POMMCP):
+class IPOMCP(MCTS):
     """Interactive Partially Observable Monte-Carlo Planning (I-POMCP).
 
     This implementation varies a bit from the original I-POMCP and CI-I-POMCP algorithms
@@ -28,7 +29,7 @@ class IPOMCP(POMMCP):
         self,
         model: M.POSGModel,
         agent_id: str,
-        config: POMMCPConfig,
+        config: MCTSConfig,
         other_agent_policies: dict[str, OtherAgentPolicy],
         search_policy: SearchPolicy,
     ):

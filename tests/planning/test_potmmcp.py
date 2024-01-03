@@ -3,10 +3,9 @@ import math
 
 import posggym
 import posggym.agents as pga
-
-from posggym_baselines.planning.mcts import POMMCPConfig
-from posggym_baselines.planning.potmmcp import POTMMCP, POTMMCPMetaPolicy
+from posggym_baselines.planning.config import MCTSConfig
 from posggym_baselines.planning.other_policy import OtherAgentMixturePolicy
+from posggym_baselines.planning.potmmcp import POTMMCP, POTMMCPMetaPolicy
 
 
 def run_policies(env, planner, other_policy, planning_agent_id, other_agent_id):
@@ -31,7 +30,7 @@ def run_policies(env, planner, other_policy, planning_agent_id, other_agent_id):
 
 def test_with_single_random_policies():
     """Test POMMCP with random policies."""
-    config = POMMCPConfig(
+    config = MCTSConfig(
         discount=0.95,
         search_time_limit=0.1,
         c=math.sqrt(2),
@@ -82,7 +81,7 @@ def test_with_single_random_policies():
 
 def test_with_other_policies_and_random_meta_policy():
     """Test POMMCP with random policies."""
-    config = POMMCPConfig(
+    config = MCTSConfig(
         discount=0.95,
         search_time_limit=0.1,
         c=math.sqrt(2),
@@ -139,7 +138,7 @@ def test_with_other_policies_and_random_meta_policy():
 
 def test_with_other_policies_and_uniform_meta_policy():
     """Test POMMCP with random policies."""
-    config = POMMCPConfig(
+    config = MCTSConfig(
         discount=0.95,
         search_time_limit=0.1,
         c=math.sqrt(2),
@@ -202,7 +201,7 @@ def test_with_other_policies_and_uniform_meta_policy():
 
 def test_with_torch_other_and_meta_policies():
     """Test POMMCP with random policies."""
-    config = POMMCPConfig(
+    config = MCTSConfig(
         discount=0.95,
         search_time_limit=0.1,
         c=math.sqrt(2),

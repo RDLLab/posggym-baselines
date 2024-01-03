@@ -4,14 +4,15 @@ import math
 import posggym
 import posggym.agents as pga
 
-from posggym_baselines.planning.mcts import POMMCPConfig, POMMCP
-from posggym_baselines.planning.search_policy import RandomSearchPolicy
+from posggym_baselines.planning.config import MCTSConfig
+from posggym_baselines.planning.mcts import MCTS
 from posggym_baselines.planning.other_policy import RandomOtherAgentPolicy
+from posggym_baselines.planning.search_policy import RandomSearchPolicy
 
 
 def test_with_random_policies():
     """Test POMMCP with random policies."""
-    config = POMMCPConfig(
+    config = MCTSConfig(
         discount=0.95,
         search_time_limit=0.1,
         c=math.sqrt(2),
@@ -39,7 +40,7 @@ def test_with_random_policies():
     search_policy = RandomSearchPolicy(env.model, planning_agent_id)
     planner_other_policy = RandomOtherAgentPolicy(env.model, other_agent_id)
 
-    planner = POMMCP(
+    planner = MCTS(
         env.model,
         planning_agent_id,
         config,

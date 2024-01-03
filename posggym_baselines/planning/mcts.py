@@ -2,8 +2,6 @@ import logging
 import math
 import random
 import time
-from collections import namedtuple
-from dataclasses import dataclass, field
 from typing import Dict, Optional, Tuple, Union
 
 import gymnasium as gym
@@ -13,90 +11,14 @@ from posggym.agents.policy import Policy, PolicyState
 from posggym.utils.history import JointHistory
 
 import posggym_baselines.planning.belief as B
+from posggym_baselines.planning.config import MCTSConfig
 from posggym_baselines.planning.node import ActionNode, ObsNode
 from posggym_baselines.planning.other_policy import OtherAgentPolicy
 from posggym_baselines.planning.search_policy import SearchPolicy
-
-KnownBounds = namedtuple("KnownBounds", ["min", "max"])
-
-
-class MinMaxStats:
-    """A class that holds the min-max values of the tree.
-
-    Ref: MuZero pseudocode
-    """
-
-    def __init__(self, known_bounds: Optional[KnownBounds]):
-        if known_bounds:
-            self.maximum = known_bounds.max
-            self.minimum = known_bounds.min
-        else:
-            self.maximum = -float("inf")
-            self.minimum = float("inf")
-
-    def update(self, value: float):
-        """Update min and mad values."""
-        self.maximum = max(self.maximum, value)
-        self.minimum = min(self.minimum, value)
-
-    def normalize(self, value: float) -> float:
-        """Normalize value given known min and max values."""
-        if self.maximum > self.minimum:
-            # Normalize only when we have set the maximum and minimum values.
-            return (value - self.minimum) / (self.maximum - self.minimum)
-        return value
-
-    def __str__(self):
-        return f"MinMaxState: (minimum: {self.minimum}, maximum: {self.maximum})"
+from posggym_baselines.planning.utils import MinMaxStats
 
 
-@dataclass
-class POMMCPConfig:
-    """Configuration for POMMCP."""
-
-    discount: float
-    search_time_limit: float
-    c: float
-    truncated: bool
-    action_selection: str = "pucb"
-    root_exploration_fraction: float = 0.25
-    known_bounds: Optional[KnownBounds] = None
-    extra_particles_prop: float = 1.0 / 16
-    step_limit: Optional[int] = None
-    epsilon: float = 0.01
-    seed: Optional[int] = None
-    state_belief_only: bool = False
-
-    num_particles: int = field(init=False)
-    extra_particles: int = field(init=False)
-    depth_limit: int = field(init=False)
-
-    def __post_init__(self):
-        assert self.discount >= 0.0 and self.discount <= 1.0
-        assert self.search_time_limit > 0.0
-        assert self.c > 0.0
-        assert (
-            self.root_exploration_fraction >= 0.0
-            and self.root_exploration_fraction <= 1.0
-        )
-        assert self.extra_particles_prop >= 0.0 and self.extra_particles_prop <= 1.0
-        assert self.epsilon > 0.0 and self.epsilon < 1.0
-
-        self.action_selection = self.action_selection.lower()
-        assert self.action_selection in ["pucb", "ucb", "uniform"]
-
-        self.num_particles = math.ceil(100 * self.search_time_limit)
-        self.extra_particles = math.ceil(self.num_particles * self.extra_particles_prop)
-
-        if self.discount == 0.0:
-            self.depth_limit = 0
-        else:
-            self.depth_limit = math.ceil(
-                math.log(self.epsilon) / math.log(self.discount)
-            )
-
-
-class POMMCP:
+class MCTS:
     """Partially Observable Multi-Agent Monte-Carlo Planning.
 
     The is the base class for the various MCTS based algorithms.
@@ -107,7 +29,7 @@ class POMMCP:
         self,
         model: M.POSGModel,
         agent_id: str,
-        config: POMMCPConfig,
+        config: MCTSConfig,
         other_agent_policies: Dict[str, OtherAgentPolicy],
         search_policy: SearchPolicy,
     ):

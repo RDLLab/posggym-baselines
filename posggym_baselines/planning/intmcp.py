@@ -12,15 +12,15 @@ from posggym.agents.policy import Policy, PolicyState
 from posggym.utils.history import AgentHistory, JointHistory
 
 import posggym_baselines.planning.belief as B
-from posggym_baselines.planning.mcts import KnownBounds, MinMaxStats
 from posggym_baselines.planning.node import ActionNode, ObsNode
 from posggym_baselines.planning.other_policy import OtherAgentPolicy
 from posggym_baselines.planning.search_policy import RandomSearchPolicy, SearchPolicy
+from posggym_baselines.planning.utils import KnownBounds, MinMaxStats
 
 
 @dataclass
 class INTMCPConfig:
-    """Configuration for POMMCP."""
+    """Configuration for INTMCP."""
 
     nesting_level: int
     discount: float

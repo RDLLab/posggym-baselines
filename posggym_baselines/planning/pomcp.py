@@ -1,11 +1,12 @@
 import posggym.model as M
 
-from posggym_baselines.planning.mcts import POMMCP, POMMCPConfig
+from posggym_baselines.planning.config import MCTSConfig
+from posggym_baselines.planning.mcts import MCTS
 from posggym_baselines.planning.other_policy import RandomOtherAgentPolicy
 from posggym_baselines.planning.search_policy import SearchPolicy
 
 
-class POMCP(POMMCP):
+class POMCP(MCTS):
     """Partially Observable Monte-Carlo Planning (POMCP).
 
     This implementation which is designed to work in multi-agent environments is the
@@ -20,7 +21,7 @@ class POMCP(POMMCP):
         self,
         model: M.POSGModel,
         agent_id: str,
-        config: POMMCPConfig,
+        config: MCTSConfig,
         search_policy: SearchPolicy,
     ):
         other_agent_policies = {
