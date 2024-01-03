@@ -21,6 +21,9 @@ class MCTSConfig:
     epsilon: float = 0.01
     seed: Optional[int] = None
     state_belief_only: bool = False
+    # if `truncated` is True, and search policy has no value function, then
+    # use rollout, otherwise exception is thrown
+    use_rollout_if_no_value: bool = True
 
     num_particles: int = field(init=False)
     extra_particles: int = field(init=False)

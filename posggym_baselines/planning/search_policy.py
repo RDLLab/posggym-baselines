@@ -9,9 +9,10 @@ from posggym.utils.history import AgentHistory
 class SearchPolicy(abc.ABC):
     """A class for representing the search policy in MCTS planning."""
 
-    def __init__(self, model: M.POSGModel, agent_id: str):
+    def __init__(self, model: M.POSGModel, agent_id: str, policy_id: str):
         self.model = model
         self.agent_id = agent_id
+        self.policy_id = policy_id
 
     @abc.abstractmethod
     def get_initial_state(self) -> PolicyState:
@@ -151,7 +152,7 @@ class RandomSearchPolicy(SearchPolicy):
     """Uniform random search policy."""
 
     def __init__(self, model: M.POSGModel, agent_id: str):
-        super().__init__(model, agent_id)
+        super().__init__(model, agent_id, "RandomSearchPolicy")
         self._action_space = model.action_spaces[agent_id]
 
     def get_initial_state(self) -> PolicyState:
@@ -181,9 +182,8 @@ class SearchPolicyWrapper(SearchPolicy):
     """Wraps a posggym.agents Policy as a SearchPolicy."""
 
     def __init__(self, policy: Policy):
-        super().__init__(policy.model, policy.agent_id)
+        super().__init__(policy.model, policy.agent_id, policy.policy_id)
         self.policy = policy
-        self.policy_id = policy.policy_id
         self.action_space = list(range(policy.model.action_spaces[policy.agent_id].n))
 
     def get_initial_state(self) -> PolicyState:

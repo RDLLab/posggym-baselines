@@ -1,224 +1,224 @@
 P0:
   greedy:
-    H1:
-      H1: 0.0
-      H2: 0.0
-      H3: 0.0
-      H4: 1.0
-      H5: 0.0
-    H2:
-      H1: 1.0
-      H2: 0.0
-      H3: 0.0
-      H4: 0.0
-      H5: 0.0
-    H3:
-      H1: 0.0
-      H2: 0.0
-      H3: 0.0
-      H4: 1.0
-      H5: 0.0
-    H4:
-      H1: 0.0
-      H2: 0.0
-      H3: 0.0
-      H4: 1.0
-      H5: 0.0
-    H5:
-      H1: 0.0
-      H2: 0.0
-      H3: 0.0
-      H4: 0.0
-      H5: 1.0
+    CooperativeReaching-v0/H1-v0:
+      CooperativeReaching-v0/H1-v0: 0.0
+      CooperativeReaching-v0/H2-v0: 0.0
+      CooperativeReaching-v0/H3-v0: 0.0
+      CooperativeReaching-v0/H4-v0: 1.0
+      CooperativeReaching-v0/H5-v0: 0.0
+    CooperativeReaching-v0/H2-v0:
+      CooperativeReaching-v0/H1-v0: 1.0
+      CooperativeReaching-v0/H2-v0: 0.0
+      CooperativeReaching-v0/H3-v0: 0.0
+      CooperativeReaching-v0/H4-v0: 0.0
+      CooperativeReaching-v0/H5-v0: 0.0
+    CooperativeReaching-v0/H3-v0:
+      CooperativeReaching-v0/H1-v0: 0.0
+      CooperativeReaching-v0/H2-v0: 0.0
+      CooperativeReaching-v0/H3-v0: 0.0
+      CooperativeReaching-v0/H4-v0: 1.0
+      CooperativeReaching-v0/H5-v0: 0.0
+    CooperativeReaching-v0/H4-v0:
+      CooperativeReaching-v0/H1-v0: 0.0
+      CooperativeReaching-v0/H2-v0: 0.0
+      CooperativeReaching-v0/H3-v0: 0.0
+      CooperativeReaching-v0/H4-v0: 1.0
+      CooperativeReaching-v0/H5-v0: 0.0
+    CooperativeReaching-v0/H5-v0:
+      CooperativeReaching-v0/H1-v0: 0.0
+      CooperativeReaching-v0/H2-v0: 0.0
+      CooperativeReaching-v0/H3-v0: 0.0
+      CooperativeReaching-v0/H4-v0: 0.0
+      CooperativeReaching-v0/H5-v0: 1.0
   softmax:
-    H1:
-      H1: 0.1442170446088315
-      H2: 0.19860529622129908
-      H3: 0.2026173893413801
-      H4: 0.3146054830262828
-      H5: 0.13995478680220647
-    H2:
-      H1: 0.24379129014253104
-      H2: 0.19564709311890582
-      H3: 0.23658616863684767
-      H4: 0.1861052717927344
-      H5: 0.137870176308981
-    H3:
-      H1: 0.1591470653116475
-      H2: 0.1302985966327559
-      H3: 0.28998485973132904
-      H4: 0.36864300653952375
-      H5: 0.051926471784743786
-    H4:
-      H1: 0.1256529365815211
-      H2: 0.1534728433115948
-      H3: 0.315299706231286
-      H4: 0.355499426079677
-      H5: 0.05007508779592106
-    H5:
-      H1: 0.19735042398955865
-      H2: 0.24346688819907944
-      H3: 0.10510721774207382
-      H4: 0.10510721774207382
-      H5: 0.34896825232721435
+    CooperativeReaching-v0/H1-v0:
+      CooperativeReaching-v0/H1-v0: 0.1442170446088315
+      CooperativeReaching-v0/H2-v0: 0.19860529622129908
+      CooperativeReaching-v0/H3-v0: 0.2026173893413801
+      CooperativeReaching-v0/H4-v0: 0.3146054830262828
+      CooperativeReaching-v0/H5-v0: 0.13995478680220647
+    CooperativeReaching-v0/H2-v0:
+      CooperativeReaching-v0/H1-v0: 0.24379129014253104
+      CooperativeReaching-v0/H2-v0: 0.19564709311890582
+      CooperativeReaching-v0/H3-v0: 0.23658616863684767
+      CooperativeReaching-v0/H4-v0: 0.1861052717927344
+      CooperativeReaching-v0/H5-v0: 0.137870176308981
+    CooperativeReaching-v0/H3-v0:
+      CooperativeReaching-v0/H1-v0: 0.1591470653116475
+      CooperativeReaching-v0/H2-v0: 0.1302985966327559
+      CooperativeReaching-v0/H3-v0: 0.28998485973132904
+      CooperativeReaching-v0/H4-v0: 0.36864300653952375
+      CooperativeReaching-v0/H5-v0: 0.051926471784743786
+    CooperativeReaching-v0/H4-v0:
+      CooperativeReaching-v0/H1-v0: 0.1256529365815211
+      CooperativeReaching-v0/H2-v0: 0.1534728433115948
+      CooperativeReaching-v0/H3-v0: 0.315299706231286
+      CooperativeReaching-v0/H4-v0: 0.355499426079677
+      CooperativeReaching-v0/H5-v0: 0.05007508779592106
+    CooperativeReaching-v0/H5-v0:
+      CooperativeReaching-v0/H1-v0: 0.19735042398955865
+      CooperativeReaching-v0/H2-v0: 0.24346688819907944
+      CooperativeReaching-v0/H3-v0: 0.10510721774207382
+      CooperativeReaching-v0/H4-v0: 0.10510721774207382
+      CooperativeReaching-v0/H5-v0: 0.34896825232721435
   uniform:
-    H1:
-      H1: 0.2
-      H2: 0.2
-      H3: 0.2
-      H4: 0.2
-      H5: 0.2
-    H2:
-      H1: 0.2
-      H2: 0.2
-      H3: 0.2
-      H4: 0.2
-      H5: 0.2
-    H3:
-      H1: 0.2
-      H2: 0.2
-      H3: 0.2
-      H4: 0.2
-      H5: 0.2
-    H4:
-      H1: 0.2
-      H2: 0.2
-      H3: 0.2
-      H4: 0.2
-      H5: 0.2
-    H5:
-      H1: 0.2
-      H2: 0.2
-      H3: 0.2
-      H4: 0.2
-      H5: 0.2
+    CooperativeReaching-v0/H1-v0:
+      CooperativeReaching-v0/H1-v0: 0.2
+      CooperativeReaching-v0/H2-v0: 0.2
+      CooperativeReaching-v0/H3-v0: 0.2
+      CooperativeReaching-v0/H4-v0: 0.2
+      CooperativeReaching-v0/H5-v0: 0.2
+    CooperativeReaching-v0/H2-v0:
+      CooperativeReaching-v0/H1-v0: 0.2
+      CooperativeReaching-v0/H2-v0: 0.2
+      CooperativeReaching-v0/H3-v0: 0.2
+      CooperativeReaching-v0/H4-v0: 0.2
+      CooperativeReaching-v0/H5-v0: 0.2
+    CooperativeReaching-v0/H3-v0:
+      CooperativeReaching-v0/H1-v0: 0.2
+      CooperativeReaching-v0/H2-v0: 0.2
+      CooperativeReaching-v0/H3-v0: 0.2
+      CooperativeReaching-v0/H4-v0: 0.2
+      CooperativeReaching-v0/H5-v0: 0.2
+    CooperativeReaching-v0/H4-v0:
+      CooperativeReaching-v0/H1-v0: 0.2
+      CooperativeReaching-v0/H2-v0: 0.2
+      CooperativeReaching-v0/H3-v0: 0.2
+      CooperativeReaching-v0/H4-v0: 0.2
+      CooperativeReaching-v0/H5-v0: 0.2
+    CooperativeReaching-v0/H5-v0:
+      CooperativeReaching-v0/H1-v0: 0.2
+      CooperativeReaching-v0/H2-v0: 0.2
+      CooperativeReaching-v0/H3-v0: 0.2
+      CooperativeReaching-v0/H4-v0: 0.2
+      CooperativeReaching-v0/H5-v0: 0.2
 P1:
   greedy:
-    H10:
-      H10: 0.0
-      H11: 0.0
-      H6: 0.0
-      H7: 0.0
-      H8: 1.0
-      H9: 0.0
-    H11:
-      H10: 0.0
-      H11: 0.0
-      H6: 0.0
-      H7: 0.0
-      H8: 0.0
-      H9: 1.0
-    H6:
-      H10: 0.3333333333333333
-      H11: 0.3333333333333333
-      H6: 0.0
-      H7: 0.0
-      H8: 0.3333333333333333
-      H9: 0.0
-    H7:
-      H10: 0.0
-      H11: 0.0
-      H6: 0.0
-      H7: 0.0
-      H8: 1.0
-      H9: 0.0
-    H8:
-      H10: 0.0
-      H11: 0.0
-      H6: 0.0
-      H7: 0.0
-      H8: 0.0
-      H9: 1.0
-    H9:
-      H10: 0.0
-      H11: 0.0
-      H6: 0.0
-      H7: 0.0
-      H8: 0.0
-      H9: 1.0
+    CooperativeReaching-v0/H10-v0:
+      CooperativeReaching-v0/H10-v0: 0.0
+      CooperativeReaching-v0/H11-v0: 0.0
+      CooperativeReaching-v0/H6-v0: 0.0
+      CooperativeReaching-v0/H7-v0: 0.0
+      CooperativeReaching-v0/H8-v0: 1.0
+      CooperativeReaching-v0/H9-v0: 0.0
+    CooperativeReaching-v0/H11-v0:
+      CooperativeReaching-v0/H10-v0: 0.0
+      CooperativeReaching-v0/H11-v0: 0.0
+      CooperativeReaching-v0/H6-v0: 0.0
+      CooperativeReaching-v0/H7-v0: 0.0
+      CooperativeReaching-v0/H8-v0: 0.0
+      CooperativeReaching-v0/H9-v0: 1.0
+    CooperativeReaching-v0/H6-v0:
+      CooperativeReaching-v0/H10-v0: 0.3333333333333333
+      CooperativeReaching-v0/H11-v0: 0.3333333333333333
+      CooperativeReaching-v0/H6-v0: 0.0
+      CooperativeReaching-v0/H7-v0: 0.0
+      CooperativeReaching-v0/H8-v0: 0.3333333333333333
+      CooperativeReaching-v0/H9-v0: 0.0
+    CooperativeReaching-v0/H7-v0:
+      CooperativeReaching-v0/H10-v0: 0.0
+      CooperativeReaching-v0/H11-v0: 0.0
+      CooperativeReaching-v0/H6-v0: 0.0
+      CooperativeReaching-v0/H7-v0: 0.0
+      CooperativeReaching-v0/H8-v0: 1.0
+      CooperativeReaching-v0/H9-v0: 0.0
+    CooperativeReaching-v0/H8-v0:
+      CooperativeReaching-v0/H10-v0: 0.0
+      CooperativeReaching-v0/H11-v0: 0.0
+      CooperativeReaching-v0/H6-v0: 0.0
+      CooperativeReaching-v0/H7-v0: 0.0
+      CooperativeReaching-v0/H8-v0: 0.0
+      CooperativeReaching-v0/H9-v0: 1.0
+    CooperativeReaching-v0/H9-v0:
+      CooperativeReaching-v0/H10-v0: 0.0
+      CooperativeReaching-v0/H11-v0: 0.0
+      CooperativeReaching-v0/H6-v0: 0.0
+      CooperativeReaching-v0/H7-v0: 0.0
+      CooperativeReaching-v0/H8-v0: 0.0
+      CooperativeReaching-v0/H9-v0: 1.0
   softmax:
-    H10:
-      H10: 0.21330931350328602
-      H11: 0.21118685037107754
-      H6: 0.21118685037107754
-      H7: 0.09208787538480129
-      H8: 0.22649962479629068
-      H9: 0.04572948557346701
-    H11:
-      H10: 0.12481880248669801
-      H11: 0.0061525283154398955
-      H6: 0.12357683465072562
-      H7: 0.20374375585444396
-      H8: 0.20579141464313705
-      H9: 0.33591666404955556
-    H6:
-      H10: 0.29813411569777104
-      H11: 0.29813411569777104
-      H6: 0.04641132199310886
-      H7: 0.029593165456788962
-      H8: 0.29813411569777104
-      H9: 0.029593165456788962
-    H7:
-      H10: 0.08003194512318808
-      H11: 0.36228307051800385
-      H6: 0.026112806618076172
-      H7: 0.027727532399944813
-      H8: 0.37706812310263904
-      H9: 0.12677652223814823
-    H8:
-      H10: 0.10533167671906238
-      H11: 0.17717079263060737
-      H6: 0.10221865521318949
-      H7: 0.17540791378914122
-      H8: 0.17022382648573384
-      H9: 0.2696471351622657
-    H9:
-      H10: 0.029186851194935807
-      H11: 0.3029956067758813
-      H6: 0.010524630860478418
-      H7: 0.0542562561394626
-      H8: 0.29699589177949415
-      H9: 0.3060407632497477
+    CooperativeReaching-v0/H10-v0:
+      CooperativeReaching-v0/H10-v0: 0.21330931350328602
+      CooperativeReaching-v0/H11-v0: 0.21118685037107754
+      CooperativeReaching-v0/H6-v0: 0.21118685037107754
+      CooperativeReaching-v0/H7-v0: 0.09208787538480129
+      CooperativeReaching-v0/H8-v0: 0.22649962479629068
+      CooperativeReaching-v0/H9-v0: 0.04572948557346701
+    CooperativeReaching-v0/H11-v0:
+      CooperativeReaching-v0/H10-v0: 0.12481880248669801
+      CooperativeReaching-v0/H11-v0: 0.0061525283154398955
+      CooperativeReaching-v0/H6-v0: 0.12357683465072562
+      CooperativeReaching-v0/H7-v0: 0.20374375585444396
+      CooperativeReaching-v0/H8-v0: 0.20579141464313705
+      CooperativeReaching-v0/H9-v0: 0.33591666404955556
+    CooperativeReaching-v0/H6-v0:
+      CooperativeReaching-v0/H10-v0: 0.29813411569777104
+      CooperativeReaching-v0/H11-v0: 0.29813411569777104
+      CooperativeReaching-v0/H6-v0: 0.04641132199310886
+      CooperativeReaching-v0/H7-v0: 0.029593165456788962
+      CooperativeReaching-v0/H8-v0: 0.29813411569777104
+      CooperativeReaching-v0/H9-v0: 0.029593165456788962
+    CooperativeReaching-v0/H7-v0:
+      CooperativeReaching-v0/H10-v0: 0.08003194512318808
+      CooperativeReaching-v0/H11-v0: 0.36228307051800385
+      CooperativeReaching-v0/H6-v0: 0.026112806618076172
+      CooperativeReaching-v0/H7-v0: 0.027727532399944813
+      CooperativeReaching-v0/H8-v0: 0.37706812310263904
+      CooperativeReaching-v0/H9-v0: 0.12677652223814823
+    CooperativeReaching-v0/H8-v0:
+      CooperativeReaching-v0/H10-v0: 0.10533167671906238
+      CooperativeReaching-v0/H11-v0: 0.17717079263060737
+      CooperativeReaching-v0/H6-v0: 0.10221865521318949
+      CooperativeReaching-v0/H7-v0: 0.17540791378914122
+      CooperativeReaching-v0/H8-v0: 0.17022382648573384
+      CooperativeReaching-v0/H9-v0: 0.2696471351622657
+    CooperativeReaching-v0/H9-v0:
+      CooperativeReaching-v0/H10-v0: 0.029186851194935807
+      CooperativeReaching-v0/H11-v0: 0.3029956067758813
+      CooperativeReaching-v0/H6-v0: 0.010524630860478418
+      CooperativeReaching-v0/H7-v0: 0.0542562561394626
+      CooperativeReaching-v0/H8-v0: 0.29699589177949415
+      CooperativeReaching-v0/H9-v0: 0.3060407632497477
   uniform:
-    H10:
-      H10: 0.16666666666666666
-      H11: 0.16666666666666666
-      H6: 0.16666666666666666
-      H7: 0.16666666666666666
-      H8: 0.16666666666666666
-      H9: 0.16666666666666666
-    H11:
-      H10: 0.16666666666666666
-      H11: 0.16666666666666666
-      H6: 0.16666666666666666
-      H7: 0.16666666666666666
-      H8: 0.16666666666666666
-      H9: 0.16666666666666666
-    H6:
-      H10: 0.16666666666666666
-      H11: 0.16666666666666666
-      H6: 0.16666666666666666
-      H7: 0.16666666666666666
-      H8: 0.16666666666666666
-      H9: 0.16666666666666666
-    H7:
-      H10: 0.16666666666666666
-      H11: 0.16666666666666666
-      H6: 0.16666666666666666
-      H7: 0.16666666666666666
-      H8: 0.16666666666666666
-      H9: 0.16666666666666666
-    H8:
-      H10: 0.16666666666666666
-      H11: 0.16666666666666666
-      H6: 0.16666666666666666
-      H7: 0.16666666666666666
-      H8: 0.16666666666666666
-      H9: 0.16666666666666666
-    H9:
-      H10: 0.16666666666666666
-      H11: 0.16666666666666666
-      H6: 0.16666666666666666
-      H7: 0.16666666666666666
-      H8: 0.16666666666666666
-      H9: 0.16666666666666666
+    CooperativeReaching-v0/H10-v0:
+      CooperativeReaching-v0/H10-v0: 0.16666666666666666
+      CooperativeReaching-v0/H11-v0: 0.16666666666666666
+      CooperativeReaching-v0/H6-v0: 0.16666666666666666
+      CooperativeReaching-v0/H7-v0: 0.16666666666666666
+      CooperativeReaching-v0/H8-v0: 0.16666666666666666
+      CooperativeReaching-v0/H9-v0: 0.16666666666666666
+    CooperativeReaching-v0/H11-v0:
+      CooperativeReaching-v0/H10-v0: 0.16666666666666666
+      CooperativeReaching-v0/H11-v0: 0.16666666666666666
+      CooperativeReaching-v0/H6-v0: 0.16666666666666666
+      CooperativeReaching-v0/H7-v0: 0.16666666666666666
+      CooperativeReaching-v0/H8-v0: 0.16666666666666666
+      CooperativeReaching-v0/H9-v0: 0.16666666666666666
+    CooperativeReaching-v0/H6-v0:
+      CooperativeReaching-v0/H10-v0: 0.16666666666666666
+      CooperativeReaching-v0/H11-v0: 0.16666666666666666
+      CooperativeReaching-v0/H6-v0: 0.16666666666666666
+      CooperativeReaching-v0/H7-v0: 0.16666666666666666
+      CooperativeReaching-v0/H8-v0: 0.16666666666666666
+      CooperativeReaching-v0/H9-v0: 0.16666666666666666
+    CooperativeReaching-v0/H7-v0:
+      CooperativeReaching-v0/H10-v0: 0.16666666666666666
+      CooperativeReaching-v0/H11-v0: 0.16666666666666666
+      CooperativeReaching-v0/H6-v0: 0.16666666666666666
+      CooperativeReaching-v0/H7-v0: 0.16666666666666666
+      CooperativeReaching-v0/H8-v0: 0.16666666666666666
+      CooperativeReaching-v0/H9-v0: 0.16666666666666666
+    CooperativeReaching-v0/H8-v0:
+      CooperativeReaching-v0/H10-v0: 0.16666666666666666
+      CooperativeReaching-v0/H11-v0: 0.16666666666666666
+      CooperativeReaching-v0/H6-v0: 0.16666666666666666
+      CooperativeReaching-v0/H7-v0: 0.16666666666666666
+      CooperativeReaching-v0/H8-v0: 0.16666666666666666
+      CooperativeReaching-v0/H9-v0: 0.16666666666666666
+    CooperativeReaching-v0/H9-v0:
+      CooperativeReaching-v0/H10-v0: 0.16666666666666666
+      CooperativeReaching-v0/H11-v0: 0.16666666666666666
+      CooperativeReaching-v0/H6-v0: 0.16666666666666666
+      CooperativeReaching-v0/H7-v0: 0.16666666666666666
+      CooperativeReaching-v0/H8-v0: 0.16666666666666666
+      CooperativeReaching-v0/H9-v0: 0.16666666666666666

@@ -1,27 +1,25 @@
 """Script for running BR-PPO evals against agent populations."""
 import argparse
 import csv
-import os
 import math
-import yaml
-from pprint import pprint
-from itertools import product
-from typing import Callable, Optional, Tuple, Dict
-from copy import deepcopy
+import os
 import time
+from copy import deepcopy
+from itertools import product
+from pprint import pprint
+from typing import Callable, Dict, Optional, Tuple
 
-import torch
 import numpy as np
-import torch
 import posggym
+import torch
+import yaml
 from posggym.agents.wrappers import AgentEnvWrapper
 from posggym.wrappers import FlattenObservations
 
-from posggym_baselines.utils import strtobool, NoOverwriteRecordVideo
+from posggym_baselines.exps.grid_world.train_br_ppo import DEFAULT_CONFIG
 from posggym_baselines.ppo.br_ppo import BRPPOConfig
 from posggym_baselines.ppo.network import PPOModel
-from posggym_baselines.exps.grid_world.train_br_ppo import DEFAULT_CONFIG
-
+from posggym_baselines.utils import NoOverwriteRecordVideo, strtobool
 
 ENV_DATA_DIR = os.path.join(os.path.dirname(__file__), "env_data")
 

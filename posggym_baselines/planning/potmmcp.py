@@ -335,7 +335,7 @@ class POTMMCPMetaPolicy(SearchPolicy):
         policies: Dict[str, Policy],
         meta_policy: Dict[str, Dict[str, float]],
     ):
-        super().__init__(model, agent_id)
+        super().__init__(model, agent_id, "POTMMCPMetaPolicy")
         assert len(model.possible_agents) == 2, "Currently only supports 2 agents"
         assert len(meta_policy) > 0
         for meta_policy_dist in meta_policy.values():
@@ -440,6 +440,14 @@ class POTMMCPMetaPolicy(SearchPolicy):
     def load_posggym_agents_meta_policy(
         model: M.POSGModel, agent_id: str, meta_policy: Dict[str, Dict[str, float]]
     ) -> "POTMMCPMetaPolicy":
+        """Load POTMMCPMetaPolicy from posggym agents meta-policy.
+
+        `meta_policy` is a dictionary mapping from other agent policy ID to a
+        distribution over ego agent policy IDs (a dictionary mapping ego agent policy
+        ID to it's probability).
+
+        """
+
         import posggym.agents as pga
 
         policy_ids = set()

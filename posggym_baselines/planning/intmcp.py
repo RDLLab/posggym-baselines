@@ -35,6 +35,9 @@ class INTMCPConfig:
     epsilon: float = 0.01
     seed: Optional[int] = None
     state_belief_only: bool = False
+    # if `truncated` is True, and search policy has no value function, then
+    # use rollout, otherwise exception is thrown
+    use_rollout_if_no_value: bool = True
 
     num_particles: int = field(init=False)
     extra_particles: int = field(init=False)
@@ -563,9 +566,19 @@ class INTMCP:
     ) -> float:
         start_time = time.time()
         if self.config.truncated:
-            v = self.search_policies[self.agent_id].get_value(
-                obs_node.search_policy_state
-            )
+            try:
+                v = self.search_policies[self.agent_id].get_value(
+                    obs_node.search_policy_state
+                )
+            except NotImplementedError as e:
+                if self.config.use_rollout_if_no_value:
+                    search_policy_states = dict(hps.policy_state)
+                    search_policy_states[self.agent_id] = obs_node.search_policy_state
+                    v = self._rollout(
+                        hps, depth, self.search_policies, search_policy_states
+                    )
+                else:
+                    raise e
         else:
             search_policy_states = dict(hps.policy_state)
             search_policy_states[self.agent_id] = obs_node.search_policy_state

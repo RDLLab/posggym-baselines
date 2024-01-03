@@ -381,7 +381,13 @@ class MCTS:
     ) -> float:
         start_time = time.time()
         if self.config.truncated:
-            v = rollout_policy.get_value(rollout_policy_state)
+            try:
+                v = rollout_policy.get_value(rollout_policy_state)
+            except NotImplementedError as e: 
+                if self.config.use_rollout_if_no_value:
+                    v = self._rollout(hps, depth, rollout_policy, rollout_policy_state)
+                else:
+                    raise e
         else:
             v = self._rollout(hps, depth, rollout_policy, rollout_policy_state)
         self._statistics["evaluation_time"] += time.time() - start_time
