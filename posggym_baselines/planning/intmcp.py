@@ -2,7 +2,6 @@ import logging
 import math
 import random
 import time
-from dataclasses import dataclass, field
 from typing import Dict, Optional, Tuple, Union
 
 import gymnasium as gym
@@ -12,66 +11,11 @@ from posggym.agents.policy import Policy, PolicyState
 from posggym.utils.history import AgentHistory, JointHistory
 
 import posggym_baselines.planning.belief as B
+from posggym_baselines.planning.config import MCTSConfig
 from posggym_baselines.planning.node import ActionNode, ObsNode
 from posggym_baselines.planning.other_policy import OtherAgentPolicy
 from posggym_baselines.planning.search_policy import RandomSearchPolicy, SearchPolicy
-from posggym_baselines.planning.utils import KnownBounds, MinMaxStats
-
-
-@dataclass
-class INTMCPConfig:
-    """Configuration for INTMCP."""
-
-    nesting_level: int
-    discount: float
-    search_time_limit: float
-    c: float
-    truncated: bool
-    action_selection: str = "pucb"
-    root_exploration_fraction: float = 0.25
-    known_bounds: Optional[KnownBounds] = None
-    extra_particles_prop: float = 1.0 / 16
-    step_limit: Optional[int] = None
-    epsilon: float = 0.01
-    seed: Optional[int] = None
-    state_belief_only: bool = False
-    # if `truncated` is True, and search policy has no value function, then
-    # use rollout, otherwise exception is thrown
-    use_rollout_if_no_value: bool = True
-
-    num_particles: int = field(init=False)
-    extra_particles: int = field(init=False)
-    depth_limit: int = field(init=False)
-    per_level_search_time_limit: float = field(init=False)
-
-    def __post_init__(self):
-        assert self.nesting_level >= 0
-        assert self.discount >= 0.0 and self.discount <= 1.0
-        assert self.search_time_limit > 0.0
-        assert self.c > 0.0
-        assert (
-            self.root_exploration_fraction >= 0.0
-            and self.root_exploration_fraction <= 1.0
-        )
-        assert self.extra_particles_prop >= 0.0 and self.extra_particles_prop <= 1.0
-        assert self.epsilon > 0.0 and self.epsilon < 1.0
-
-        self.action_selection = self.action_selection.lower()
-        assert self.action_selection in ["pucb", "ucb", "uniform"]
-
-        self.num_particles = math.ceil(100 * self.search_time_limit)
-        self.extra_particles = math.ceil(self.num_particles * self.extra_particles_prop)
-
-        if self.discount == 0.0:
-            self.depth_limit = 0
-        else:
-            self.depth_limit = math.ceil(
-                math.log(self.epsilon) / math.log(self.discount)
-            )
-
-        self.per_level_search_time_limit = self.search_time_limit / (
-            self.nesting_level + 1
-        )
+from posggym_baselines.planning.utils import MinMaxStats
 
 
 class INTMCP:
@@ -89,7 +33,7 @@ class INTMCP:
         self,
         model: M.POSGModel,
         agent_id: str,
-        config: INTMCPConfig,
+        config: MCTSConfig,
         nesting_level: int,
         other_agent_policies: Optional[Dict[str, "INTMCP"]],
         search_policies: Dict[str, SearchPolicy],
@@ -411,6 +355,8 @@ class INTMCP:
     #######################################################
 
     def get_action(self) -> M.ActType:
+        # Note: this function should only be called from top level tree
+        # recursive calls during search are done via the _nested_sim function
         root = self.traverse(self.history)
         if root.is_absorbing:
             self._log_debug("Agent in absorbing state. Not running search.")
@@ -421,15 +367,16 @@ class INTMCP:
         )
         start_time = time.time()
 
+        per_level_search_time_limit = self.config.search_time_limit / (
+            self.nesting_level + 1
+        )
         n_sims = 0
         for level in range(self.nesting_level + 1):
             self._log_info(f"Searching level {level=}")
             n_sims += self._statistics["num_sims"]
 
             level_start_time = time.time()
-            while (
-                time.time() - level_start_time < self.config.per_level_search_time_limit
-            ):
+            while time.time() - level_start_time < per_level_search_time_limit:
                 self._nested_sim(self.history, level, True)
                 n_sims += 1
 
@@ -993,7 +940,7 @@ class INTMCP:
         cls,
         model: M.POSGModel,
         ego_agent_id: str,
-        config: INTMCPConfig,
+        config: MCTSConfig,
         nesting_level: int,
         search_policies: Optional[Dict[int, Dict[str, SearchPolicy]]],
     ) -> "INTMCP":

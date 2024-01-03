@@ -1,9 +1,8 @@
-"""Script for running POTMMCP baseline experiments.
+"""Script for running INTMCP baseline experiments.
 
 Specifically, for a given baseline environment and population (P0, P1) and mode 
-(in-distribution, out-of-distribution), run POTMMCP for `num_episodes` episodes for
+(in-distribution, out-of-distribution), run INTMCP for `num_episodes` episodes for
 various search budgets and save the results to a file.
-
 
 in-distribution - planning agent is evaluated against the same population that it uses
     for planning
@@ -12,7 +11,6 @@ out-of-distribution - planning agent is evaluated against different population t
 
 """
 import argparse
-import copy
 import itertools
 import multiprocessing as mp
 import os
@@ -24,33 +22,25 @@ import exp_utils
 import posggym
 import torch
 from posggym_baselines.planning.config import MCTSConfig
-from posggym_baselines.planning.other_policy import OtherAgentMixturePolicy
-from posggym_baselines.planning.potmmcp import POTMMCP, POTMMCPMetaPolicy
+from posggym_baselines.planning.intmcp import INTMCP
 
 
-# experiments limited to softmax meta policy since it's generally the best
-DEFAULT_META_POLICY = "softmax"
+# same as in I-POMCP paper experiments
+# also best performing value in I-NTMCP paper
+# also around what humans use
+DEFAULT_NESTING_LEVEL = 2
 
 
-def init_potmmcp(
+def init_intmcp(
     model: posggym.model.POSGModel,
     exp_params: exp_utils.PlanningExpParams,
-) -> POTMMCP:
-    search_policy = POTMMCPMetaPolicy.load_posggym_agents_meta_policy(
-        model, exp_params.agent_id, exp_params.planner_kwargs["meta_policy"]
-    )
-    planner_other_agent_policies = {
-        i: OtherAgentMixturePolicy.load_posggym_agents_policy(model, i, policy_ids)
-        for i, policy_ids in exp_params.planner_kwargs[
-            "planning_other_agent_policy_ids"
-        ].items()
-    }
-    planner = POTMMCP(
+) -> INTMCP:
+    planner = INTMCP.initialize(
         model,
         exp_params.agent_id,
         config=exp_params.config,
-        other_agent_policies=planner_other_agent_policies,
-        search_policy=search_policy,
+        nesting_level=exp_params.planner_kwargs["nesting_level"],
+        search_policies=None,  # Use RandomSearchPolicy
     )
     return planner
 
@@ -74,7 +64,7 @@ def main(args):
     print("agents_P1:")
     pprint.pprint(env_data.agents_P1)
 
-    exp_name = f"POTMMCP_{args.env_id}"
+    exp_name = f"INTMCP_{args.env_id}"
     if args.agent_id is not None:
         exp_name += f"_i{args.agent_id}"
     exp_name += f"_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -82,6 +72,9 @@ def main(args):
     exp_results_parent_dir = os.path.join(exp_utils.RESULTS_DIR, exp_name)
     if not os.path.exists(exp_results_parent_dir):
         os.makedirs(exp_results_parent_dir)
+
+    config_kwargs = dict(exp_utils.DEFAULT_PLANNING_CONFIG_KWARGS_UCB)
+    config_kwargs["truncated"] = False
 
     # generate all experiment parameters
     all_exp_params = []
@@ -92,20 +85,10 @@ def main(args):
         exp_params = exp_utils.PlanningExpParams(
             env_kwargs=env_data.env_kwargs,
             agent_id=env_data.agent_id,
-            config=MCTSConfig(
-                search_time_limit=search_time,
-                **exp_utils.DEFAULT_PLANNING_CONFIG_KWARGS_PUCB,
-            ),
-            planner_init_fn=init_potmmcp,
+            config=MCTSConfig(search_time_limit=search_time, **config_kwargs),
+            planner_init_fn=init_intmcp,
             planner_kwargs={
-                "meta_policy": copy.deepcopy(
-                    env_data.meta_policy[planning_pop_id][DEFAULT_META_POLICY]
-                ),
-                "planning_other_agent_policy_ids": (
-                    env_data.agents_P0
-                    if planning_pop_id == "P0"
-                    else env_data.agents_P1
-                ),
+                "nesting_level": args.nesting_level,
             },
             test_other_agent_policy_ids=(
                 env_data.agents_P0 if test_pop_id == "P0" else env_data.agents_P1
@@ -150,6 +133,12 @@ if __name__ == "__main__":
         type=str,
         default=None,
         help="ID of agent.",
+    )
+    parser.add_argument(
+        "--nesting_level",
+        type=int,
+        default=DEFAULT_NESTING_LEVEL,
+        help="Nesting level to use for planner.",
     )
     parser.add_argument(
         "--num_episodes",

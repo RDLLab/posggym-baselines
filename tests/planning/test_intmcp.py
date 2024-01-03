@@ -3,7 +3,8 @@ import math
 
 import posggym
 import posggym.agents as pga
-from posggym_baselines.planning.intmcp import INTMCP, INTMCPConfig
+from posggym_baselines.planning.config import MCTSConfig
+from posggym_baselines.planning.intmcp import INTMCP
 from posggym_baselines.planning.search_policy import load_posggym_agents_search_policy
 
 
@@ -29,8 +30,7 @@ def run_policies(env, planner, other_policy, planning_agent_id, other_agent_id):
 
 def test_with_random_search_policy(render_mode="human", nesting_level=1):
     """Test INTMCP with random search policy."""
-    config = INTMCPConfig(
-        nesting_level=nesting_level,
+    config = MCTSConfig(
         discount=0.95,
         search_time_limit=0.1 * (nesting_level + 1),
         c=math.sqrt(2),
@@ -70,8 +70,7 @@ def test_with_random_search_policy(render_mode="human", nesting_level=1):
 
 def test_with_pga_search_policy(render_mode="human", nesting_level=1):
     """Test POMCP with POSGGym.Agents search policy."""
-    config = INTMCPConfig(
-        nesting_level=nesting_level,
+    config = MCTSConfig(
         discount=0.95,
         search_time_limit=0.1 * (nesting_level + 1),
         c=math.sqrt(2),

@@ -10,9 +10,9 @@ from typing import Any, Callable, Dict, List, Optional
 import posggym
 import yaml
 from posggym.agents.wrappers import AgentEnvWrapper
-
 from posggym_baselines.planning.config import MCTSConfig
 from posggym_baselines.utils.agent_env_wrapper import UniformOtherAgentFn
+
 
 ENV_DATA_DIR = os.path.join(os.path.dirname(__file__), "env_data")
 RESULTS_DIR = os.path.join(os.path.dirname(__file__), "results")
@@ -46,6 +46,7 @@ DEFAULT_PLANNING_CONFIG_KWARGS_PUCB = {
 
 DEFAULT_PLANNING_CONFIG_KWARGS_UCB = dict(DEFAULT_PLANNING_CONFIG_KWARGS_PUCB)
 DEFAULT_PLANNING_CONFIG_KWARGS_UCB["action_selection"] = "ucb"
+DEFAULT_PLANNING_CONFIG_KWARGS_UCB["truncated"] = False
 DEFAULT_PLANNING_CONFIG_KWARGS_UCB["c"] = math.sqrt(2)
 
 
