@@ -1,15 +1,52 @@
+import csv
+import math
 import os
-from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+import pprint
+import time
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any, Callable, Dict, List, Optional
 
+import posggym
 import yaml
+from posggym.agents.wrappers import AgentEnvWrapper
 
+from posggym_baselines.planning.config import MCTSConfig
+from posggym_baselines.utils.agent_env_wrapper import UniformOtherAgentFn
 
 ENV_DATA_DIR = os.path.join(os.path.dirname(__file__), "env_data")
 RESULTS_DIR = os.path.join(os.path.dirname(__file__), "results")
 
 if not os.path.exists(RESULTS_DIR):
     os.makedirs(RESULTS_DIR)
+
+
+# Defaul parameters
+DEFAULT_SEARCH_TIMES = [0.1, 1.0, 5.0, 10.0, 20.0]
+DEFAULT_NUM_EPISODES = 500
+DEFAULT_EXP_TIME_LIMIT = 60 * 60 * 48  # 48 hours
+
+DEFAULT_PLANNING_CONFIG_KWARGS_PUCB = {
+    "discount": 0.99,
+    # "search_time_limit": 0.1,   # Set below
+    "c": 1.25,
+    "truncated": True,
+    "action_selection": "pucb",
+    "root_exploration_fraction": 0.5,
+    "known_bounds": None,
+    "extra_particles_prop": 1.0 / 16,
+    "step_limit": None,  # Set in algorithm, if env has a step limit
+    "epsilon": 0.01,
+    "seed": None,
+    "state_belief_only": False,
+    # fallback to rollout if search policy has no value function
+    "use_rollout_if_no_value": True,
+}
+
+
+DEFAULT_PLANNING_CONFIG_KWARGS_UCB = dict(DEFAULT_PLANNING_CONFIG_KWARGS_PUCB)
+DEFAULT_PLANNING_CONFIG_KWARGS_UCB["action_selection"] = "ucb"
+DEFAULT_PLANNING_CONFIG_KWARGS_UCB["c"] = math.sqrt(2)
 
 
 @dataclass
@@ -105,3 +142,190 @@ def get_env_data(env_id: str, agent_id: Optional[str]):
         rl_br_results_file=os.path.join(env_data_path, "br_results.csv"),
         meta_policy=meta_policy,
     )
+
+
+@dataclass
+class PlanningExpParams:
+    """Parameters for running POTMMCP experiments."""
+
+    # stuff used for running experiments
+    env_kwargs: Dict
+    agent_id: Optional[str]
+    config: MCTSConfig
+    # kwargs and fn for initializing planner
+    planner_init_fn: Callable[[posggym.POSGModel, "PlanningExpParams"], Any]
+    planner_kwargs: Dict
+    # other agent policies that planning agent is evaluated against
+    test_other_agent_policy_ids: Dict[str, List[str]]
+    # number of episodes
+    num_episodes: int
+    # time limit for experiment
+    exp_time_limit: int
+
+    # experiment details for saving results
+    exp_name: str
+    exp_num: int
+    exp_results_parent_dir: str
+    planning_pop_id: str
+    test_pop_id: str
+
+    exp_results_dir: str = field(init=False)
+    episode_results_file: str = field(init=False)
+    exp_args_file: str = field(init=False)
+    exp_log_file: str = field(init=False)
+    episode_results_heads: List[str] = field(init=False)
+    exp_start_time: float = field(init=False)
+
+    def __post_init__(self):
+        search_time = self.config.search_time_limit
+        if search_time < 1.0:
+            search_time_str = f"{search_time:.1f}"
+        else:
+            search_time_str = f"{search_time:.0f}"
+
+        self.exp_results_dir = os.path.join(
+            self.exp_results_parent_dir,
+            f"{self.exp_num}_{self.planning_pop_id}_{self.test_pop_id}_{search_time_str}",
+        )
+
+        self.episode_results_file = os.path.join(
+            self.exp_results_dir, "episode_results.csv"
+        )
+        self.exp_args_file = os.path.join(self.exp_results_dir, "exp_args.yaml")
+        self.exp_log_file = os.path.join(self.exp_results_dir, "exp_log.txt")
+
+        self.episode_results_heads = [
+            "num",
+            "len",
+            "return",
+            "discounted_return",
+            "time",
+        ]
+
+    def setup_exp(self):
+        """Runs necessary setup for experiment.
+
+        I.e. setup results directy, files, logging, etc
+        """
+        self.exp_start_time = time.time()
+
+        if not os.path.exists(self.exp_results_dir):
+            os.makedirs(self.exp_results_dir)
+
+        exp_args = {
+            "exp_num": self.exp_num,
+            "env_id": self.env_kwargs["env_id"],
+            "agent_id": self.agent_id,
+            "planning_pop_id": self.planning_pop_id,
+            "test_pop_id": self.test_pop_id,
+            "search_time_limit": self.config.search_time_limit,
+            "num_episodes": self.num_episodes,
+            "exp_time_limit": self.exp_time_limit,
+        }
+        with open(self.exp_args_file, "w") as f:
+            yaml.safe_dump(exp_args, f)
+
+        with open(self.episode_results_file, "w") as f:
+            writer = csv.DictWriter(f, fieldnames=self.episode_results_heads)
+            writer.writeheader()
+
+        with open(self.exp_log_file, "w") as f:
+            f.write(f"Experiment Name: {self.exp_name}\n")
+            f.write(f"Experiment Num: {self.exp_num}\n")
+            f.write(f"Start Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+            f.write("Experiment Args:\n")
+            f.write(pprint.pformat(exp_args, indent=4, sort_dicts=False) + "\n\n")
+
+    def finalize_exp(self):
+        """Runs necessary finalization for experiment.
+
+        I.e. save results, etc
+        """
+        time_taken = time.time() - self.exp_start_time
+        hours, rem = divmod(time_taken, 3600)
+        minutes, seconds = divmod(rem, 60)
+
+        with open(self.exp_log_file, "a") as f:
+            f.write("Experiment finished" + "\n")
+            f.write(f"Finish Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write(f"Total Time Taken={hours:02.0f}:{minutes:02.0f}:{seconds:02.0f}\n")
+
+    def write_episode_results(self, results: Dict):
+        with open(self.episode_results_file, "a") as f:
+            writer = csv.DictWriter(f, fieldnames=self.episode_results_heads)
+            writer.writerow(results)
+
+    def write_log(self, log: str, add_timestamp: bool = True):
+        if add_timestamp:
+            time_taken = time.time() - self.exp_start_time
+            hours, rem = divmod(time_taken, 3600)
+            minutes, seconds = divmod(rem, 60)
+            log = f"[{hours:02.0f}:{minutes:02.0f}:{seconds:02.0f}] {log}"
+
+        with open(self.exp_log_file, "a") as f:
+            f.write(log + "\n")
+
+
+def run_planning_exp(exp_params: PlanningExpParams):
+    print(f"Running experiment {exp_params.exp_num}")
+    exp_params.setup_exp()
+
+    # initialize environment (including folding in test population)
+    env = posggym.make(
+        exp_params.env_kwargs["env_id"], **exp_params.env_kwargs["env_kwargs"]
+    )
+    other_agent_fn = UniformOtherAgentFn(exp_params.test_other_agent_policy_ids)
+    env = AgentEnvWrapper(env, other_agent_fn)
+
+    planner = exp_params.planner_init_fn(env.model, exp_params)
+
+    # run episode loop
+    exp_start_time = time.time()
+    episode_num = 0
+    while (
+        episode_num < exp_params.num_episodes
+        and time.time() - exp_start_time < exp_params.exp_time_limit
+    ):
+        obs, _ = env.reset()
+        planner.reset()
+
+        episode_results = {
+            "num": episode_num,
+            "len": 0,
+            "return": 0,
+            "discounted_return": 0,
+            "time": 0,
+        }
+        episode_start_time = time.time()
+        done = False
+        while not done:
+            action = planner.step(obs[exp_params.agent_id])
+            obs, rewards, terms, truncs, all_done, _ = env.step(
+                {exp_params.agent_id: action}
+            )
+
+            # only care about planning agent finishing
+            done = terms[exp_params.agent_id] or truncs[exp_params.agent_id] or all_done
+
+            reward = rewards[exp_params.agent_id]
+            episode_results["return"] += reward
+            episode_results["discounted_return"] += (
+                exp_params.config.discount ** episode_results["len"] * reward
+            )
+            episode_results["len"] += 1
+
+        episode_results["time"] = time.time() - episode_start_time
+        exp_params.write_episode_results(episode_results)
+        episode_num += 1
+
+        if episode_num % max(1, exp_params.num_episodes // 10) == 0:
+            exp_params.write_log(
+                f"Episode {episode_num}/{exp_params.num_episodes} complete.",
+                add_timestamp=True,
+            )
+
+    # finalize experiment
+    env.close()
+    planner.close()
+    exp_params.finalize_exp()
+    print(f"Experiment {exp_params.exp_num} complete.")

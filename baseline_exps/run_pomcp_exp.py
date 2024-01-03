@@ -1,7 +1,7 @@
-"""Script for running POTMMCP baseline experiments.
+"""Script for running POMCP baseline experiments.
 
 Specifically, for a given baseline environment and population (P0, P1) and mode 
-(in-distribution, out-of-distribution), run POTMMCP for `num_episodes` episodes for
+(in-distribution, out-of-distribution), run POMCP for `num_episodes` episodes for
 various search budgets and save the results to a file.
 
 
@@ -12,7 +12,6 @@ out-of-distribution - planning agent is evaluated against different population t
 
 """
 import argparse
-import copy
 import itertools
 import multiprocessing as mp
 import os
@@ -25,31 +24,19 @@ import posggym
 import torch
 
 from posggym_baselines.planning.config import MCTSConfig
-from posggym_baselines.planning.other_policy import OtherAgentMixturePolicy
-from posggym_baselines.planning.potmmcp import POTMMCP, POTMMCPMetaPolicy
-
-# experiments limited to softmax meta policy since it's generally the best
-DEFAULT_META_POLICY = "softmax"
+from posggym_baselines.planning.pomcp import POMCP
+from posggym_baselines.planning.search_policy import RandomSearchPolicy
 
 
-def init_potmmcp(
+def init_pomcp(
     model: posggym.model.POSGModel,
     exp_params: exp_utils.PlanningExpParams,
-) -> POTMMCP:
-    search_policy = POTMMCPMetaPolicy.load_posggym_agents_meta_policy(
-        model, exp_params.agent_id, exp_params.planner_kwargs["meta_policy"]
-    )
-    planner_other_agent_policies = {
-        i: OtherAgentMixturePolicy.load_posggym_agents_policy(model, i, policy_ids)
-        for i, policy_ids in exp_params.planner_kwargs[
-            "planning_other_agent_policy_ids"
-        ].items()
-    }
-    planner = POTMMCP(
+) -> POMCP:
+    search_policy = RandomSearchPolicy(model, exp_params.agent_id)
+    planner = POMCP(
         model,
         exp_params.agent_id,
         config=exp_params.config,
-        other_agent_policies=planner_other_agent_policies,
         search_policy=search_policy,
     )
     return planner
@@ -74,7 +61,7 @@ def main(args):
     print("agents_P1:")
     pprint.pprint(env_data.agents_P1)
 
-    exp_name = f"POTMMCP_{args.env_id}"
+    exp_name = f"POMCP_{args.env_id}"
     if args.agent_id is not None:
         exp_name += f"_i{args.agent_id}"
     exp_name += f"_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -82,6 +69,10 @@ def main(args):
     exp_results_parent_dir = os.path.join(exp_utils.RESULTS_DIR, exp_name)
     if not os.path.exists(exp_results_parent_dir):
         os.makedirs(exp_results_parent_dir)
+
+    config_kwargs = dict(exp_utils.DEFAULT_PLANNING_CONFIG_KWARGS_UCB)
+    config_kwargs["truncated"] = False
+    config_kwargs["state_belief_only"] = True
 
     # generate all experiment parameters
     all_exp_params = []
@@ -92,21 +83,9 @@ def main(args):
         exp_params = exp_utils.PlanningExpParams(
             env_kwargs=env_data.env_kwargs,
             agent_id=env_data.agent_id,
-            config=MCTSConfig(
-                search_time_limit=search_time,
-                **exp_utils.DEFAULT_PLANNING_CONFIG_KWARGS_PUCB,
-            ),
-            planner_init_fn=init_potmmcp,
-            planner_kwargs={
-                "meta_policy": copy.deepcopy(
-                    env_data.meta_policy[planning_pop_id][DEFAULT_META_POLICY]
-                ),
-                "planning_other_agent_policy_ids": (
-                    env_data.agents_P0
-                    if planning_pop_id == "P0"
-                    else env_data.agents_P1
-                ),
-            },
+            config=MCTSConfig(search_time_limit=search_time, **config_kwargs),
+            planner_init_fn=init_pomcp,
+            planner_kwargs={},
             test_other_agent_policy_ids=(
                 env_data.agents_P0 if test_pop_id == "P0" else env_data.agents_P1
             ),
