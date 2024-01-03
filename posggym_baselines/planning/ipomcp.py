@@ -1,3 +1,5 @@
+from typing import Dict
+
 import posggym.model as M
 
 from posggym_baselines.planning.config import MCTSConfig
@@ -30,7 +32,7 @@ class IPOMCP(MCTS):
         model: M.POSGModel,
         agent_id: str,
         config: MCTSConfig,
-        other_agent_policies: dict[str, OtherAgentPolicy],
+        other_agent_policies: Dict[str, OtherAgentPolicy],
         search_policy: SearchPolicy,
     ):
         super().__init__(model, agent_id, config, other_agent_policies, search_policy)
