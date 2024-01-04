@@ -15,7 +15,7 @@ from posggym_baselines.planning.config import MCTSConfig
 from posggym_baselines.planning.node import ActionNode, ObsNode
 from posggym_baselines.planning.other_policy import OtherAgentPolicy
 from posggym_baselines.planning.search_policy import SearchPolicy
-from posggym_baselines.planning.utils import MinMaxStats
+from posggym_baselines.planning.utils import MinMaxStats, PlanningStatTracker
 
 
 class MCTS:
@@ -81,8 +81,9 @@ class MCTS:
         self._last_action = None
 
         self._step_num = 0
-        self._statistics: Dict[str, float] = {}
+        self.step_statistics: Dict[str, float] = {}
         self._reset_step_statistics()
+        self.stat_tracker = PlanningStatTracker(self)
 
         self._logger = logging.getLogger()
 
@@ -93,8 +94,8 @@ class MCTS:
     def step(self, obs: M.ObsType) -> M.ActType:
         assert self.step_limit is None or self.root.t <= self.step_limit
         if self.root.is_absorbing:
-            for k in self._statistics:
-                self._statistics[k] = np.nan
+            for k in self.step_statistics:
+                self.step_statistics[k] = np.nan
             return self._last_action
 
         self._reset_step_statistics()
@@ -105,6 +106,8 @@ class MCTS:
         self._last_action = self.get_action()
         self._step_num += 1
 
+        self.stat_tracker.step()
+
         return self._last_action
 
     #######################################################
@@ -113,6 +116,7 @@ class MCTS:
 
     def reset(self):
         self._log_info("Reset")
+        self.stat_tracker.reset_episode()
         self._step_num = 0
         self._min_max_stats = MinMaxStats(self.config.known_bounds)
         self._reset_step_statistics()
@@ -128,7 +132,7 @@ class MCTS:
         self._last_action = None
 
     def _reset_step_statistics(self):
-        self._statistics = {
+        self.step_statistics = {
             "search_time": 0.0,
             "update_time": 0.0,
             "reinvigoration_time": 0.0,
@@ -158,7 +162,7 @@ class MCTS:
             self._update(action, obs)
 
         update_time = time.time() - start_time
-        self._statistics["update_time"] = update_time
+        self.step_statistics["update_time"] = update_time
         self._log_info(f"Update time = {update_time:.4f}s")
 
     def _initial_update(self, init_obs: M.ObsType):
@@ -279,11 +283,11 @@ class MCTS:
             n_sims += 1
 
         search_time = time.time() - start_time
-        self._statistics["search_time"] = search_time
-        self._statistics["search_depth"] = max_search_depth
-        self._statistics["num_sims"] = n_sims
-        self._statistics["min_value"] = self._min_max_stats.minimum
-        self._statistics["max_value"] = self._min_max_stats.maximum
+        self.step_statistics["search_time"] = search_time
+        self.step_statistics["search_depth"] = max_search_depth
+        self.step_statistics["num_sims"] = n_sims
+        self.step_statistics["min_value"] = self._min_max_stats.minimum
+        self.step_statistics["max_value"] = self._min_max_stats.maximum
         self._log_info(f"{search_time=:.2f} {max_search_depth=}")
         if self.config.known_bounds is None:
             self._log_info(
@@ -383,14 +387,14 @@ class MCTS:
         if self.config.truncated:
             try:
                 v = rollout_policy.get_value(rollout_policy_state)
-            except NotImplementedError as e: 
+            except NotImplementedError as e:
                 if self.config.use_rollout_if_no_value:
                     v = self._rollout(hps, depth, rollout_policy, rollout_policy_state)
                 else:
                     raise e
         else:
             v = self._rollout(hps, depth, rollout_policy, rollout_policy_state)
-        self._statistics["evaluation_time"] += time.time() - start_time
+        self.step_statistics["evaluation_time"] += time.time() - start_time
         return v
 
     def _rollout(
@@ -454,8 +458,8 @@ class MCTS:
         # inference time and number of policy calls
         start_time = time.time()
         next_hidden_state = policy.get_next_state(action, obs, policy_state)
-        self._statistics["inference_time"] += time.time() - start_time
-        self._statistics["policy_calls"] += 1
+        self.step_statistics["inference_time"] += time.time() - start_time
+        self.step_statistics["policy_calls"] += 1
         return next_hidden_state
 
     def _update_other_agent_policies(
@@ -719,7 +723,7 @@ class MCTS:
         )
 
         reinvig_time = time.time() - start_time
-        self._statistics["reinvigoration_time"] += reinvig_time
+        self.step_statistics["reinvigoration_time"] += reinvig_time
 
     def _reinvigorate_action_fn(
         self, hps: B.HistoryPolicyState, ego_action: M.ActType

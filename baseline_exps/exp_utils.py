@@ -10,9 +10,10 @@ from typing import Any, Callable, Dict, List, Optional
 import posggym
 import yaml
 from posggym.agents.wrappers import AgentEnvWrapper
-
 from posggym_baselines.planning.config import MCTSConfig
+from posggym_baselines.planning.utils import PlanningStatTracker
 from posggym_baselines.utils.agent_env_wrapper import UniformOtherAgentFn
+
 
 ENV_DATA_DIR = os.path.join(os.path.dirname(__file__), "env_data")
 RESULTS_DIR = os.path.join(os.path.dirname(__file__), "results")
@@ -279,7 +280,7 @@ class PlanningExpParams:
             "return",
             "discounted_return",
             "time",
-        ]
+        ] + PlanningStatTracker.STAT_KEYS
 
     def setup_exp(self):
         """Runs necessary setup for experiment.
@@ -394,6 +395,7 @@ def run_planning_exp(exp_params: PlanningExpParams):
             episode_results["len"] += 1
 
         episode_results["time"] = time.time() - episode_start_time
+        episode_results.update(planner.stat_tracker.get_episode())
         exp_params.write_episode_results(episode_results)
         episode_num += 1
 

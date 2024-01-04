@@ -15,7 +15,7 @@ from posggym_baselines.planning.config import MCTSConfig
 from posggym_baselines.planning.node import ActionNode, ObsNode
 from posggym_baselines.planning.other_policy import OtherAgentPolicy
 from posggym_baselines.planning.search_policy import RandomSearchPolicy, SearchPolicy
-from posggym_baselines.planning.utils import MinMaxStats
+from posggym_baselines.planning.utils import MinMaxStats, PlanningStatTracker
 
 
 class INTMCP:
@@ -98,8 +98,9 @@ class INTMCP:
         self.history = AgentHistory.get_init_history(obs=None)
 
         self._step_num = 0
-        self._statistics: Dict[str, float] = {}
+        self.step_statistics: Dict[str, float] = {}
         self._reset_step_statistics()
+        self.stat_tracker = PlanningStatTracker(self)
 
         self._logger = logging.getLogger()
 
@@ -111,8 +112,8 @@ class INTMCP:
         root = self.traverse(self.history)
         assert self.step_limit is None or root.t <= self.step_limit
         if root.is_absorbing:
-            for k in self._statistics:
-                self._statistics[k] = np.nan
+            for k in self.step_statistics:
+                self.step_statistics[k] = np.nan
             return self._last_action
 
         self._reset_step_statistics()
@@ -123,7 +124,8 @@ class INTMCP:
         self._last_action = self.get_action()
         self._step_num += 1
 
-        self._statistics.update(self._collect_nested_statistics())
+        self.step_statistics.update(self._collect_nested_statistics())
+        self.stat_tracker.step()
 
         return self._last_action
 
@@ -132,11 +134,14 @@ class INTMCP:
         # Only adds statistics that are collected at each level, so doesn't
         # add up 'search_time' or 'update_time' which are only collected
         # in the top tree
-        stats = {"reinvigoration_time": self._statistics["reinvigoration_time"]}
+        stats = {"reinvigoration_time": self.step_statistics["reinvigoration_time"]}
         if self.nesting_level > 0:
             for pi in self.other_agent_policies.values():
                 nested_stats = pi._collect_nested_statistics()
                 for key in stats:
+                    if key in ("search_depth", "min_value", "max_value"):
+                        # ignore search depth from lower levels
+                        continue
                     stats[key] += nested_stats[key]
         return stats
 
@@ -146,6 +151,7 @@ class INTMCP:
 
     def reset(self):
         self._log_info("Reset")
+        self.stat_tracker.reset_episode()
         self._step_num = 0
         self._min_max_stats = MinMaxStats(self.config.known_bounds)
 
@@ -166,7 +172,7 @@ class INTMCP:
         self._reset_step_statistics()
 
     def _reset_step_statistics(self):
-        self._statistics = {
+        self.step_statistics = {
             "search_time": 0.0,
             "update_time": 0.0,
             "reinvigoration_time": 0.0,
@@ -198,7 +204,7 @@ class INTMCP:
             self._nested_update({self.history: 1.0}, len(self.history.history))
 
         update_time = time.time() - start_time
-        self._statistics["update_time"] = update_time
+        self.step_statistics["update_time"] = update_time
         self._log_info(f"Update time = {update_time:.4f}s")
 
     def _initial_nested_update(self, history_dist: Dict[AgentHistory, float]):
@@ -373,7 +379,7 @@ class INTMCP:
         n_sims = 0
         for level in range(self.nesting_level + 1):
             self._log_info(f"Searching level {level=}")
-            n_sims += self._statistics["num_sims"]
+            n_sims += self.step_statistics["num_sims"]
 
             level_start_time = time.time()
             while time.time() - level_start_time < per_level_search_time_limit:
@@ -381,11 +387,11 @@ class INTMCP:
                 n_sims += 1
 
         search_time = time.time() - start_time
-        self._statistics["search_time"] = search_time
-        self._statistics["num_sims"] = n_sims
-        self._statistics["min_value"] = self._min_max_stats.minimum
-        self._statistics["max_value"] = self._min_max_stats.maximum
-        max_search_depth = self._statistics["search_depth"]
+        self.step_statistics["search_time"] = search_time
+        self.step_statistics["num_sims"] = n_sims
+        self.step_statistics["min_value"] = self._min_max_stats.minimum
+        self.step_statistics["max_value"] = self._min_max_stats.maximum
+        max_search_depth = self.step_statistics["search_depth"]
         self._log_info(f"{search_time=:.2f} {max_search_depth=} {n_sims=}")
         if self.config.known_bounds is None:
             self._log_info(
@@ -426,8 +432,8 @@ class INTMCP:
         else:
             _, search_depth = self._simulate(hps, root, 0)
             root.visits += 1
-            self._statistics["search_depth"] = max(
-                self._statistics["search_depth"], search_depth
+            self.step_statistics["search_depth"] = max(
+                self.step_statistics["search_depth"], search_depth
             )
 
     def _simulate(
@@ -530,7 +536,7 @@ class INTMCP:
             search_policy_states = dict(hps.policy_state)
             search_policy_states[self.agent_id] = obs_node.search_policy_state
             v = self._rollout(hps, depth, self.search_policies, search_policy_states)
-        self._statistics["evaluation_time"] += time.time() - start_time
+        self.step_statistics["evaluation_time"] += time.time() - start_time
         return v
 
     def _rollout(
@@ -595,8 +601,8 @@ class INTMCP:
         # inference time and number of policy calls
         start_time = time.time()
         next_hidden_state = policy.get_next_state(action, obs, policy_state)
-        self._statistics["inference_time"] += time.time() - start_time
-        self._statistics["policy_calls"] += 1
+        self.step_statistics["inference_time"] += time.time() - start_time
+        self.step_statistics["policy_calls"] += 1
         return next_hidden_state
 
     def _update_other_agent_search_policies(
@@ -878,7 +884,7 @@ class INTMCP:
         )
 
         reinvig_time = time.time() - start_time
-        self._statistics["reinvigoration_time"] += reinvig_time
+        self.step_statistics["reinvigoration_time"] += reinvig_time
 
     def _reinvigorate_action_fn(
         self, hps: B.HistoryPolicyState, ego_action: M.ActType

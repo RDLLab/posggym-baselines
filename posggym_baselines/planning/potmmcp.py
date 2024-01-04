@@ -188,11 +188,11 @@ class POTMMCP(MCTS):
             n_sims += 1
 
         search_time = time.time() - start_time
-        self._statistics["search_time"] = search_time
-        self._statistics["search_depth"] = max_search_depth
-        self._statistics["num_sims"] = n_sims
-        self._statistics["min_value"] = self._min_max_stats.minimum
-        self._statistics["max_value"] = self._min_max_stats.maximum
+        self.step_statistics["search_time"] = search_time
+        self.step_statistics["search_depth"] = max_search_depth
+        self.step_statistics["num_sims"] = n_sims
+        self.step_statistics["min_value"] = self._min_max_stats.minimum
+        self.step_statistics["max_value"] = self._min_max_stats.maximum
         self._log_info(f"{search_time=:.2f} {max_search_depth=}")
         if self.config.known_bounds is None:
             self._log_info(
