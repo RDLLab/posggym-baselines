@@ -390,4 +390,6 @@ if __name__ == "__main__":
             print()
             main(args)
     else:
+        if args.agent_id == "":
+            args.agent_id = None
         main(args)
