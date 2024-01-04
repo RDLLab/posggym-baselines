@@ -23,10 +23,10 @@ from datetime import datetime
 import exp_utils
 import posggym
 import torch
+
 from posggym_baselines.planning.config import MCTSConfig
 from posggym_baselines.planning.other_policy import OtherAgentMixturePolicy
 from posggym_baselines.planning.potmmcp import POTMMCP, POTMMCPMetaPolicy
-
 
 # experiments limited to softmax meta policy since it's generally the best
 DEFAULT_META_POLICY = "softmax"
@@ -181,8 +181,6 @@ if __name__ == "__main__":
     if args.env_id == "all":
         print("Running all envs")
         for env_id in os.listdir(exp_utils.ENV_DATA_DIR):
-            if env_id == "Driving-v1":
-                continue
             if env_id.endswith("_i0"):
                 agent_id = "0"
                 env_id = env_id.replace("_i0", "")

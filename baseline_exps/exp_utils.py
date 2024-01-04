@@ -10,9 +10,9 @@ from typing import Any, Callable, Dict, List, Optional
 import posggym
 import yaml
 from posggym.agents.wrappers import AgentEnvWrapper
+
 from posggym_baselines.planning.config import MCTSConfig
 from posggym_baselines.utils.agent_env_wrapper import UniformOtherAgentFn
-
 
 ENV_DATA_DIR = os.path.join(os.path.dirname(__file__), "env_data")
 RESULTS_DIR = os.path.join(os.path.dirname(__file__), "results")
@@ -50,6 +50,26 @@ DEFAULT_PLANNING_CONFIG_KWARGS_UCB["truncated"] = False
 DEFAULT_PLANNING_CONFIG_KWARGS_UCB["c"] = math.sqrt(2)
 
 
+PURSUITEVASION_POLICY_NAMES = {
+    0: {
+        "P0": [f"KLR{i}_i0" for i in list(range(5)) + ["BR"]],
+        "P1": [f"RL{i+1}_i0" for i in range(6)],
+    },
+    1: {
+        "P0": [f"KLR{i}_i1" for i in list(range(5)) + ["BR"]],
+        "P1": [f"RL{i+1}_i1" for i in range(6)],
+    },
+}
+
+PURSUITEVASION_POLICY_NAMES_TO_IDS = {}
+for agent_id, pop_map in PURSUITEVASION_POLICY_NAMES.items():
+    for pop_policy_names in pop_map.values():
+        for policy_name in pop_policy_names:
+            PURSUITEVASION_POLICY_NAMES_TO_IDS[
+                policy_name
+            ] = f"PursuitEvasion-v1/grid=16x16/{policy_name}-v0"
+
+
 @dataclass
 class EnvData:
     """Data for a particular environment."""
@@ -67,6 +87,12 @@ class EnvData:
     agents_P0: Dict[str, List[str]]
     agents_P1: Dict[str, List[str]]
     pop_div_results_file: str
+    # policy names are shorthand for policy IDs
+    # pop_id -> List[str]
+    pop_policy_names: Dict[str, List[str]]
+    pop_co_team_names: Dict[str, List[str]]
+    # map from policy_name -> policy_id
+    policy_name_to_id: Dict[str, str]
 
     # RL data
     # [P0, P1] -> [seed] -> model_file
@@ -77,6 +103,9 @@ class EnvData:
     # Meta policy pop_id -> meta_policy_type -> meta_policy
     # [P0, P1] -> [greedy, softmax, uniform] -> meta_policy
     meta_policy: Dict[str, Dict[str, Dict[str, Dict[str, float]]]]
+    # Experiment results
+    planning_results_file: str
+    planning_summary_results_file: str
 
 
 def get_env_data(env_id: str, agent_id: Optional[str]):
@@ -107,8 +136,32 @@ def get_env_data(env_id: str, agent_id: Optional[str]):
 
     other_agent_id = next(iter(agents_P0.keys()))
     assert other_agent_id == next(iter(agents_P1.keys()))
-
     ego_agent_id = "0" if other_agent_id == "1" else "1"
+
+    pop_policy_names = {}
+    pop_co_team_names = {}
+    policy_name_to_id = {}
+    if env_id == "PursuitEvasion-v1_i0":
+        for pop_id in ["P0", "P1"]:
+            pop_policy_names[pop_id] = PURSUITEVASION_POLICY_NAMES[1][pop_id]
+            pop_co_team_names[pop_id] = PURSUITEVASION_POLICY_NAMES[0][pop_id]
+        policy_name_to_id = PURSUITEVASION_POLICY_NAMES_TO_IDS
+    elif env_id == "PursuitEvasion-v1_i1":
+        for pop_id in ["P0", "P1"]:
+            pop_policy_names[pop_id] = PURSUITEVASION_POLICY_NAMES[0][pop_id]
+            pop_co_team_names[pop_id] = PURSUITEVASION_POLICY_NAMES[1][pop_id]
+        policy_name_to_id = PURSUITEVASION_POLICY_NAMES_TO_IDS
+    else:
+        for pop_id, pop in zip(["P0", "P1"], [agents_P0, agents_P1]):
+            policy_ids = list(pop.values())[0]
+            policy_names = []
+            for policy_id in policy_ids:
+                policy_name = policy_id.split("/")[-1].split("-v")[0]
+                policy_names.append(policy_name)
+                policy_name_to_id[policy_name] = policy_id
+
+            pop_policy_names[pop_id] = policy_names
+            pop_co_team_names[pop_id] = policy_names
 
     # RL Data
     br_models_dir = os.path.join(env_data_path, "br_models")
@@ -139,10 +192,35 @@ def get_env_data(env_id: str, agent_id: Optional[str]):
         agents_P0=agents_P0,
         agents_P1=agents_P1,
         pop_div_results_file=os.path.join(env_data_path, "div_results.csv"),
+        pop_policy_names=pop_policy_names,
+        pop_co_team_names=pop_co_team_names,
+        policy_name_to_id=policy_name_to_id,
         br_model_files=br_model_files,
         rl_br_results_file=os.path.join(env_data_path, "br_results.csv"),
         meta_policy=meta_policy,
+        planning_results_file=os.path.join(env_data_path, "planning_results.csv"),
+        planning_summary_results_file=os.path.join(
+            env_data_path, "planning_summary_results.csv"
+        ),
     )
+
+
+def load_all_env_data() -> Dict[str, EnvData]:
+    """Load data for all environments."""
+    all_env_data = {}
+    full_env_ids = os.listdir(ENV_DATA_DIR)
+    full_env_ids.sort()
+    for full_env_id in full_env_ids:
+        tokens = full_env_id.split("_")
+        if len(tokens) == 1:
+            env_id = tokens[0]
+            agent_id = None
+        else:
+            assert len(tokens) == 2
+            env_id = tokens[0]
+            agent_id = tokens[1].replace("i", "")
+        all_env_data[full_env_id] = get_env_data(env_id, agent_id)
+    return all_env_data
 
 
 @dataclass

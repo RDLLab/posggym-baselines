@@ -22,6 +22,7 @@ from datetime import datetime
 import exp_utils
 import posggym
 import torch
+
 from posggym_baselines.planning.config import MCTSConfig
 from posggym_baselines.planning.pomcp import POMCP
 from posggym_baselines.planning.search_policy import RandomSearchPolicy
@@ -159,8 +160,6 @@ if __name__ == "__main__":
     if args.env_id == "all":
         print("Running all envs")
         for env_id in os.listdir(exp_utils.ENV_DATA_DIR):
-            if env_id == "Driving-v1":
-                continue
             if env_id.endswith("_i0"):
                 agent_id = "0"
                 env_id = env_id.replace("_i0", "")

@@ -26,7 +26,7 @@ import yaml
 
 
 def compile_sub_experiment_results(
-    parent_dir: str, save_to_file: bool = True
+    parent_dir: str, save_to_file: bool = True, summarize: bool = True
 ) -> pd.DataFrame:
     """Compile results from all sub-experiments of (alg, env) into a single file.
 
@@ -37,6 +37,10 @@ def compile_sub_experiment_results(
     save_to_file
         Whether to save compiled results to file. Will be saved to `parent_dir` as
         `planning_results.csv`.
+    summarize
+        Whether to summarize results over all episodes. If True, will compute mean,
+        std, and 95% confidence interval over all episodes. Otherwise will return
+        results for each episode.
 
     Returns
     -------
@@ -51,32 +55,31 @@ def compile_sub_experiment_results(
     results_dirs = [d for d in parent_dir.iterdir() if d.is_dir()]
 
     # get summary results file for each sub-experiment
-    summarized_exp_results = []
+    all_sub_exp_results = []
     for results_dir in results_dirs:
         results_file = results_dir / "episode_results.csv"
         exp_args_file = results_dir / "exp_args.yaml"
 
-        # read in episode results and summarize
-        # we want to get the mean and std over all episodes
-        episode_results_df = pd.read_csv(results_file)
+        sub_exp_results_df = pd.read_csv(results_file)
+        if summarize:
+            # get the mean, std, 95CI over all episodes
+            num_episodes = sub_exp_results_df.shape[0]
+            assert num_episodes == sub_exp_results_df["num"].max() + 1
+            mean_results = sub_exp_results_df.mean(axis=0).to_dict()
+            std_results = sub_exp_results_df.std(axis=0).to_dict()
+            summary_results = {
+                "num_episodes": num_episodes,
+            }
+            for k, v in mean_results.items():
+                if k == "num":
+                    continue
+                summary_results[f"{k}_mean"] = [v]
+                summary_results[f"{k}_std"] = [std_results[k]]
+                summary_results[f"{k}_95ci"] = [
+                    1.96 * std_results[k] / (num_episodes**0.5)
+                ]
 
-        num_episodes = episode_results_df.shape[0]
-        assert num_episodes == episode_results_df["num"].max() + 1
-        mean_results = episode_results_df.mean(axis=0).to_dict()
-        std_results = episode_results_df.std(axis=0).to_dict()
-        summary_results = {
-            "num_episodes": num_episodes,
-        }
-        for k, v in mean_results.items():
-            if k == "num":
-                continue
-            summary_results[f"{k}_mean"] = [v]
-            summary_results[f"{k}_std"] = [std_results[k]]
-            summary_results[f"{k}_95ci"] = [
-                1.96 * std_results[k] / (num_episodes**0.5)
-            ]
-
-        summary_results_df = pd.DataFrame(summary_results)
+            sub_exp_results_df = pd.DataFrame(summary_results)
 
         # add in experiment arguments
         with open(exp_args_file, "r") as f:
@@ -85,13 +88,13 @@ def compile_sub_experiment_results(
         for k, v in exp_args.items():
             if k == "num_episodes":
                 k = "num_episodes_limit"
-            summary_results_df.insert(0, k, v)
+            sub_exp_results_df.insert(0, k, v)
 
         # add experiment arguments to summarized results
-        summarized_exp_results.append(summary_results_df)
+        all_sub_exp_results.append(sub_exp_results_df)
 
     # combine all episode results into a single dataframe
-    combined_results = pd.concat(summarized_exp_results, ignore_index=True)
+    combined_results = pd.concat(all_sub_exp_results, ignore_index=True)
 
     # save combined results
     if save_to_file:
@@ -102,7 +105,7 @@ def compile_sub_experiment_results(
 
 
 def combine_all_experiment_results(
-    parent_dir: str, save_to_file: bool = True
+    parent_dir: str, save_to_file: bool = True, summarize: bool = True
 ) -> Dict[str, pd.DataFrame]:
     """Combine results from all experiments (alg, env) in `parent_dir`.
 
@@ -117,6 +120,10 @@ def combine_all_experiment_results(
     save_to_file
         Whether to save combined results to file. Will be saved to `parent_dir` as
         `<env_id>[_agent_id]_planning_results.csv`.
+    summarize
+        Whether to summarize results over all episodes. If True, will compute mean,
+        std, and 95% confidence interval over all episodes for each (alg, env)
+        sub-experiment Otherwise results will contain results for each episode.
 
     Returns
     -------
@@ -142,7 +149,7 @@ def combine_all_experiment_results(
             all_env_exp_results[env_id] = []
 
         env_alg_results = compile_sub_experiment_results(
-            exp_parent_dir, save_to_file=False
+            exp_parent_dir, save_to_file=False, summarize=summarize
         )
 
         # add alg name as column to results
@@ -156,11 +163,15 @@ def combine_all_experiment_results(
 
     # save combined results
     if save_to_file:
+        if summarize:
+            save_file_suffix = "planning_summary_results.csv"
+        else:
+            save_file_suffix = "planning_results.csv"
+
         for env_id in combined_results:
-            print(f"Saving results to {parent_dir / f'{env_id}_planning_results.csv'}")
-            combined_results[env_id].to_csv(
-                parent_dir / f"{env_id}_planning_results.csv", index=False
-            )
+            env_save_file = parent_dir / f"{env_id}_{save_file_suffix}"
+            print(f"Saving results to {env_save_file}")
+            combined_results[env_id].to_csv(env_save_file, index=False)
 
     return combined_results
 
@@ -182,10 +193,15 @@ if __name__ == "__main__":
         nargs="+",
         help="Path to parent directory (or multiple) containing experiment results.",
     )
+    parser.add_argument(
+        "--summarize",
+        action="store_true",
+        help="Whether to summarize results across episodes",
+    )
     args = parser.parse_args()
 
     for parent_dir in args.exp_results_parent_dirs:
         if args.mode == "single":
-            compile_sub_experiment_results(parent_dir)
+            compile_sub_experiment_results(parent_dir, summarize=args.summarize)
         elif args.mode == "all":
-            combine_all_experiment_results(parent_dir)
+            combine_all_experiment_results(parent_dir, summarize=args.summarize)

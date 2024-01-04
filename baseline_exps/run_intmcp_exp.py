@@ -21,9 +21,9 @@ from datetime import datetime
 import exp_utils
 import posggym
 import torch
+
 from posggym_baselines.planning.config import MCTSConfig
 from posggym_baselines.planning.intmcp import INTMCP
-
 
 # same as in I-POMCP paper experiments
 # also best performing value in I-NTMCP paper
@@ -170,8 +170,6 @@ if __name__ == "__main__":
     if args.env_id == "all":
         print("Running all envs")
         for env_id in os.listdir(exp_utils.ENV_DATA_DIR):
-            if env_id == "Driving-v1":
-                continue
             if env_id.endswith("_i0"):
                 agent_id = "0"
                 env_id = env_id.replace("_i0", "")
