@@ -25,6 +25,7 @@ import exp_utils
 import posggym
 import torch
 from exp_utils import PlanningExpParams
+
 from posggym_baselines.planning.config import MCTSConfig
 from posggym_baselines.planning.intmcp import INTMCP
 from posggym_baselines.planning.ipomcp import IPOMCP
@@ -32,7 +33,6 @@ from posggym_baselines.planning.other_policy import OtherAgentMixturePolicy
 from posggym_baselines.planning.pomcp import POMCP
 from posggym_baselines.planning.potmmcp import POTMMCP, POTMMCPMetaPolicy
 from posggym_baselines.planning.search_policy import RandomSearchPolicy
-
 
 # same as in I-POMCP paper experiments
 # also best performing value in I-NTMCP paper
@@ -390,6 +390,6 @@ if __name__ == "__main__":
             print()
             main(args)
     else:
-        if args.agent_id == "":
+        if args.agent_id == "" or args.agent_id == "None":
             args.agent_id = None
         main(args)
