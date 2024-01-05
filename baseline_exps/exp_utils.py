@@ -10,10 +10,10 @@ from typing import Any, Callable, Dict, List, Optional
 import posggym
 import yaml
 from posggym.agents.wrappers import AgentEnvWrapper
+
 from posggym_baselines.planning.config import MCTSConfig
 from posggym_baselines.planning.utils import PlanningStatTracker
 from posggym_baselines.utils.agent_env_wrapper import UniformOtherAgentFn
-
 
 ENV_DATA_DIR = os.path.join(os.path.dirname(__file__), "env_data")
 RESULTS_DIR = os.path.join(os.path.dirname(__file__), "results")
@@ -212,6 +212,8 @@ def load_all_env_data() -> Dict[str, EnvData]:
     full_env_ids = os.listdir(ENV_DATA_DIR)
     full_env_ids.sort()
     for full_env_id in full_env_ids:
+        if not os.path.isdir(os.path.join(ENV_DATA_DIR, full_env_id)):
+            continue
         tokens = full_env_id.split("_")
         if len(tokens) == 1:
             env_id = tokens[0]

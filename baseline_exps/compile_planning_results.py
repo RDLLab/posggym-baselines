@@ -18,11 +18,13 @@ Script has two modes:
 
 """
 import argparse
+import os.path as osp
 from pathlib import Path
 from typing import Dict
 
 import pandas as pd
 import yaml
+from exp_utils import ENV_DATA_DIR
 
 
 def compile_sub_experiment_results(
@@ -105,7 +107,10 @@ def compile_sub_experiment_results(
 
 
 def combine_all_experiment_results(
-    parent_dir: str, save_to_file: bool = True, summarize: bool = True
+    parent_dir: str,
+    save_to_file: bool = True,
+    summarize: bool = True,
+    save_to_main_results_dir: bool = False,
 ) -> Dict[str, pd.DataFrame]:
     """Combine results from all experiments (alg, env) in `parent_dir`.
 
@@ -169,7 +174,10 @@ def combine_all_experiment_results(
             save_file_suffix = "planning_results.csv"
 
         for env_id in combined_results:
-            env_save_file = parent_dir / f"{env_id}_{save_file_suffix}"
+            if save_to_main_results_dir:
+                env_save_file = osp.join(ENV_DATA_DIR, env_id, save_file_suffix)
+            else:
+                env_save_file = parent_dir / f"{env_id}_{save_file_suffix}"
             print(f"Saving results to {env_save_file}")
             combined_results[env_id].to_csv(env_save_file, index=False)
 
@@ -198,10 +206,22 @@ if __name__ == "__main__":
         action="store_true",
         help="Whether to summarize results across episodes",
     )
+    parser.add_argument(
+        "--save_to_main_results_dir",
+        action="store_true",
+        help=(
+            "Whether to save results to main `env_data` dir. Will overwrite existing "
+            "results so be careful."
+        ),
+    )
     args = parser.parse_args()
 
     for parent_dir in args.exp_results_parent_dirs:
         if args.mode == "single":
             compile_sub_experiment_results(parent_dir, summarize=args.summarize)
         elif args.mode == "all":
-            combine_all_experiment_results(parent_dir, summarize=args.summarize)
+            combine_all_experiment_results(
+                parent_dir,
+                summarize=args.summarize,
+                save_to_main_results_dir=args.save_to_main_results_dir,
+            )
