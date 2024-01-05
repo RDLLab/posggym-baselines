@@ -312,7 +312,6 @@ def main(args):
     with mp.Pool(args.n_cpus) as pool:
         pool.map(exp_utils.run_planning_exp, all_exp_params)
 
-    time.sleep(1)
     time_taken = time.time() - start_time
     hours, rem = divmod(time_taken, 3600)
     minutes, seconds = divmod(rem, 60)

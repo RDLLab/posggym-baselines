@@ -15,8 +15,9 @@ from posggym_baselines.planning.config import MCTSConfig
 from posggym_baselines.planning.utils import PlanningStatTracker
 from posggym_baselines.utils.agent_env_wrapper import UniformOtherAgentFn
 
-ENV_DATA_DIR = os.path.join(os.path.dirname(__file__), "env_data")
-RESULTS_DIR = os.path.join(os.path.dirname(__file__), "results")
+BASELINE_EXP_DIR = os.path.dirname(__file__)
+ENV_DATA_DIR = os.path.join(BASELINE_EXP_DIR, "env_data")
+RESULTS_DIR = os.path.join(BASELINE_EXP_DIR, "results")
 
 if not os.path.exists(RESULTS_DIR):
     os.makedirs(RESULTS_DIR)
@@ -349,7 +350,7 @@ class PlanningExpParams:
 
 
 def run_planning_exp(exp_params: PlanningExpParams):
-    print(f"Running experiment {exp_params.exp_num}")
+    print(f"Running experiment {exp_params.exp_name} {exp_params.exp_num}")
     exp_params.setup_exp()
 
     # initialize environment (including folding in test population)
@@ -411,4 +412,4 @@ def run_planning_exp(exp_params: PlanningExpParams):
     env.close()
     planner.close()
     exp_params.finalize_exp()
-    print(f"Experiment {exp_params.exp_num} complete.")
+    print(f"Experiment {exp_params.exp_name} {exp_params.exp_num} complete.")
