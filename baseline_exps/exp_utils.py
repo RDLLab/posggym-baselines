@@ -124,19 +124,15 @@ def get_env_data(env_id: str, agent_id: Optional[str]):
         env_kwargs = yaml.safe_load(f)
 
     # Population Data
-    agents_P0_file = (
-        env_data_path / "agents_P0.yaml"
-        if agent_id is None
-        else f"agents_P0_i{agent_id}.yaml",
+    agents_P0_file = env_data_path / (
+        "agents_P0.yaml" if agent_id is None else f"agents_P0_i{agent_id}.yaml"
     )
 
     with open(agents_P0_file, "r") as f:
         agents_P0 = yaml.safe_load(f)
 
-    agents_P1_file = (
-        env_data_path / "agents_P1.yaml"
-        if agent_id is None
-        else f"agents_P1_i{agent_id}.yaml",
+    agents_P1_file = env_data_path / (
+        "agents_P1.yaml" if agent_id is None else f"agents_P1_i{agent_id}.yaml"
     )
 
     with open(agents_P1_file, "r") as f:
