@@ -309,8 +309,12 @@ def main(args):
 
     start_time = time.time()
     # run experiments
-    with mp.Pool(args.n_cpus) as pool:
-        pool.map(exp_utils.run_planning_exp, all_exp_params)
+    if args.n_cpus == 1:
+        for exp_params in all_exp_params:
+            exp_utils.run_planning_exp(exp_params)
+    else:
+        with mp.Pool(args.n_cpus, maxtasksperchild=1) as pool:
+            pool.map(exp_utils.run_planning_exp, all_exp_params)
 
     time_taken = time.time() - start_time
     hours, rem = divmod(time_taken, 3600)
