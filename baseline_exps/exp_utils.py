@@ -2,12 +2,14 @@ import csv
 import math
 import pprint
 import time
+import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional
 from pathlib import Path
 
 import posggym
+import psutil
 import yaml
 from posggym.agents.wrappers import AgentEnvWrapper
 
@@ -112,8 +114,10 @@ def get_env_data(env_id: str, agent_id: Optional[str]):
     """Get the env data for the given env name."""
     if agent_id is None:
         env_data_path = ENV_DATA_DIR / env_id
+        full_env_id = env_id
     else:
         env_data_path = ENV_DATA_DIR / f"{env_id}_i{agent_id}"
+        full_env_id = f"{env_id}_i{agent_id}"
 
     env_kwargs_file = env_data_path / "env_kwargs.yaml"
     with open(env_kwargs_file, "r") as f:
@@ -145,12 +149,12 @@ def get_env_data(env_id: str, agent_id: Optional[str]):
     pop_policy_names = {}
     pop_co_team_names = {}
     policy_name_to_id = {}
-    if env_id == "PursuitEvasion-v1_i0":
+    if full_env_id == "PursuitEvasion-v1_i0":
         for pop_id in ["P0", "P1"]:
             pop_policy_names[pop_id] = PURSUITEVASION_POLICY_NAMES[1][pop_id]
             pop_co_team_names[pop_id] = PURSUITEVASION_POLICY_NAMES[0][pop_id]
         policy_name_to_id = PURSUITEVASION_POLICY_NAMES_TO_IDS
-    elif env_id == "PursuitEvasion-v1_i1":
+    elif full_env_id == "PursuitEvasion-v1_i1":
         for pop_id in ["P0", "P1"]:
             pop_policy_names[pop_id] = PURSUITEVASION_POLICY_NAMES[0][pop_id]
             pop_co_team_names[pop_id] = PURSUITEVASION_POLICY_NAMES[1][pop_id]
@@ -335,7 +339,17 @@ class PlanningExpParams:
             writer = csv.DictWriter(f, fieldnames=self.episode_results_heads)
             writer.writerow(results)
 
-    def write_log(self, log: str, add_timestamp: bool = True):
+    def write_log(
+        self,
+        log: str,
+        add_timestamp: bool = True,
+        report_mem_usage: bool = True,
+    ):
+        if report_mem_usage:
+            process = psutil.Process(os.getpid())
+            mem_usage = process.memory_info().rss / 1024**2
+            log = f"(MEM={mem_usage:.0f}MB) {log}"
+
         if add_timestamp:
             time_taken = time.time() - self.exp_start_time
             hours, rem = divmod(time_taken, 3600)
@@ -347,7 +361,10 @@ class PlanningExpParams:
 
 
 def run_planning_exp(exp_params: PlanningExpParams):
-    print(f"Running experiment {exp_params.exp_name} {exp_params.exp_num}")
+    print(
+        f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] "
+        f"Running experiment {exp_params.exp_name} {exp_params.exp_num}"
+    )
     exp_params.setup_exp()
 
     # initialize environment (including folding in test population)
@@ -399,14 +416,18 @@ def run_planning_exp(exp_params: PlanningExpParams):
         exp_params.write_episode_results(episode_results)
         episode_num += 1
 
-        if episode_num % max(1, exp_params.num_episodes // 10) == 0:
+        if episode_num % max(1, exp_params.num_episodes // 100) == 0:
             exp_params.write_log(
                 f"Episode {episode_num}/{exp_params.num_episodes} complete.",
                 add_timestamp=True,
+                report_mem_usage=True,
             )
 
     # finalize experiment
     env.close()
     planner.close()
     exp_params.finalize_exp()
-    print(f"Experiment {exp_params.exp_name} {exp_params.exp_num} complete.")
+    print(
+        f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] "
+        f"Experiment {exp_params.exp_name} {exp_params.exp_num} complete."
+    )

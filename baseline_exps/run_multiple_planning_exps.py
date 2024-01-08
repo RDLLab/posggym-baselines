@@ -71,7 +71,7 @@ def main(args):
 
     start_time = time.time()
     # run experiments
-    with mp.Pool(args.n_cpus) as pool:
+    with mp.Pool(args.n_cpus, maxtasksperchild=1) as pool:
         print("Running experiments...")
         pool.map(exp_utils.run_planning_exp, all_exp_params)
 
