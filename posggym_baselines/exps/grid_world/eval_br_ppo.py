@@ -5,7 +5,7 @@ import yaml
 from pprint import pprint
 from typing import Callable, Optional, Tuple, Dict
 from copy import deepcopy
-
+from pathlib import Path
 import numpy as np
 import torch
 import posggym
@@ -238,24 +238,24 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--saved_model_dir",
-        type=str,
+        type=Path,
         required=True,
         help="Directory containing saved model to evaluate.",
     )
     parser.add_argument(
         "--env_kwargs_file",
-        type=str,
+        type=Path,
         help="Path to YAML file containing env kwargs.",
     )
     parser.add_argument(
         "--train_agents_file",
-        type=str,
+        type=Path,
         default=None,
         help="Path to YAML file containing training population of other agents.",
     )
     parser.add_argument(
         "--test_agents_file",
-        type=str,
+        type=Path,
         default=None,
         help="Path to YAML file containing training population of other agents.",
     )

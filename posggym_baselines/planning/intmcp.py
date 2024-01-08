@@ -22,9 +22,9 @@ class INTMCP:
     """Interactive Nested Tree Monte-Carlo Planning (I-NTMCP).
 
     I-NTMCP models the problem as an I-POMDP and uses MCTS to generate the policy at
-    each nesting level. I-NTMCP is equivelent to CI-I-POMCP when the lower level models
+    each nesting level. I-NTMCP is equivalent to CI-I-POMCP when the lower level models
     are solved via MCTS, and assuming no explicit communication (communication can still
-    occur via actions and observations but it is not explicitly modelled as seperate
+    occur via actions and observations but it is not explicitly modelled as separate
     actions and observations).
 
     """
@@ -272,7 +272,7 @@ class INTMCP:
 
     def _nested_update(self, history_dist: Dict[AgentHistory, float], current_t: int):
         self._log_debug("Pruning unused nodes from tree")
-        # traverse all nodes in tree upto current step
+        # traverse all nodes in tree up to current step
         for action_node in self.root.children:
             for obs_node in action_node.children:
                 h = AgentHistory(((action_node.action, obs_node.obs),))

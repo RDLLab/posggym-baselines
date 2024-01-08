@@ -21,7 +21,7 @@ def run_rollout_worker(
     The rollout worker collect batches of trajectories and sends them to the learner
     for training.
 
-    At the start of each batch, the rollout worker recieves which policies to use along
+    At the start of each batch, the rollout worker receives which policies to use along
     with their weights from the learner.
 
     Arguments
@@ -31,7 +31,7 @@ def run_rollout_worker(
     config
         The configuration for this rollout worker.
     recv_queue
-        The queue from which to recieve the policy weights, etc from the learner.
+        The queue from which to receive the policy weights, etc from the learner.
     send_queue
         The queue to which to send the collected trajectories to the learner.
     terminate_event
@@ -304,7 +304,7 @@ def run_rollout_worker(
             }
         )
 
-    print(f"Worker {worker_id} - Termination signal recieved.")
+    print(f"Worker {worker_id} - Termination signal received.")
     envs.close()
 
     print(f"Worker {worker_id} - Releasing shared resources.")

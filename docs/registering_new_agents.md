@@ -6,7 +6,7 @@ Given an Rllib trained agent that has been saved to a checkpoint, you can regist
 
 We need to save the policy configuration and it's weights to a file. This can be done using the `rllib_to_posggym_agent_file.py` script.:
 
-For example, given the output of the training is saved in `~/posggym_results/env_name/policies/run_name/None/pi_SP/` and we want to save the `pi_SP` policy from the checkpoint `checkpoint_001000`: 
+For example, given the output of the training is saved in `~/posggym_results/env_name/policies/run_name/None/pi_SP/` and we want to save the `pi_SP` policy from the checkpoint `checkpoint_001000`:
 
 ```bash
 python rllib_to_posggym_agent_file.py \
@@ -16,7 +16,7 @@ python rllib_to_posggym_agent_file.py \
 
 ```
 
-Or for checkpoints from new training scipt that uses `ray.tune`:
+Or for checkpoints from new training script that uses `ray.tune`:
 
 ```bash
 python rllib_to_posggym_agent_file_v2.py \
@@ -27,7 +27,7 @@ python rllib_to_posggym_agent_file_v2.py \
 
 ## 2. Save the new policy file into the `posggym-agent-models` repository
 
-The `posggym-agent-models` repository contains the model weights for the `posggym.agents`. You need to add the policy you want to register to this repository, being carefull to add it along the file path that will match exactly where the policy will be registered within `posggym.agents`. 
+The `posggym-agent-models` repository contains the model weights for the `posggym.agents`. You need to add the policy you want to register to this repository, being careful to add it along the file path that will match exactly where the policy will be registered within `posggym.agents`.
 
 For example, to add a policy for the `DrivingContinuous-v0` environment, where the policy will be registered from the file `posggym.agents.continuous.driving.__init__.py`. The policy file should be added to the `posggym-agent-models` repository at `posggym-agent-models/posggym/agents/continuous/driving/` directory or a subdirectory of this directory.
 
@@ -64,6 +64,5 @@ If all is working correctly, then push the new `model_state.pkl` to the `posggym
 To test all is working properly, you can remove the `model_state.pkl` file from `posggym/assets/agents/` and try to load the policy again. If it downloads and then loads correctly, then it is being loaded from the `posggym-agent-models` repo.
 
 ## 7. Push changes to `posggym-agents` repository
-    
-Finally, push the changes to the `posggym.agents` repository.
 
+Finally, push the changes to the `posggym.agents` repository.

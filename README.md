@@ -10,6 +10,3 @@ git clone git@github.com:RDLLab/posggym-baselines.git
 cd posggym-baselines
 pip install -e .
 ```
-
-
-

@@ -1,12 +1,10 @@
 """Base configuration for RCPD."""
 from __future__ import annotations
 
-import os
 import random
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING, Dict, List, Optional, Union
-
 import numpy as np
 import torch
 from posggym.vector import SyncVectorEnv
@@ -17,6 +15,8 @@ from posggym_baselines.ppo.eval import EvalFn, run_all_pairwise_evaluation
 
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     import gymnasium as gym
 
     from posggym.agents.utils.processors import Processor
@@ -68,13 +68,13 @@ class PPOConfig:
     # wandb group name
     wandb_group: str = None
     # Directory where the model and logs will be saved
-    log_dir: str = field(init=False)
+    log_dir: Path = field(init=False)
     # Directory where videos will be saved
-    video_dir: str = field(init=False)
+    video_dir: Path = field(init=False)
     # Directory where models will be saved
-    model_dir: str = field(init=False)
+    model_dir: Path = field(init=False)
     # optional directory to load existing algorithm/model from
-    load_dir: str = None
+    load_dir: Path = None
     # number of updates (i.e. batches) after which the model/algorithm is saved
     # if 0, never save
     # if > 0, save every save_interval updates
@@ -172,15 +172,15 @@ class PPOConfig:
             self.run_name += f"_{self.env_id}"
         self.run_name += f"_{self.seed}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
-        self.log_dir = os.path.join(BASE_RESULTS_DIR, self.run_name)
-        self.video_dir = os.path.join(self.log_dir, "videos")
-        self.model_dir = os.path.join(self.log_dir, "models")
+        self.log_dir = BASE_RESULTS_DIR / self.run_name
+        self.video_dir = self.log_dir / "videos"
+        self.model_dir = self.log_dir / "models"
 
         if not self.disable_logging:
-            os.makedirs(os.path.dirname(self.log_dir), exist_ok=True)
-            os.makedirs(self.log_dir, exist_ok=True)
-            os.makedirs(self.video_dir, exist_ok=True)
-            os.makedirs(self.model_dir, exist_ok=True)
+            self.log_dir.parent.mkdir(parents=True, exist_ok=True)
+            self.log_dir.mkdir(exist_ok=True)
+            self.video_dir.mkdir(exist_ok=True)
+            self.model_dir.mkdir(exist_ok=True)
 
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() and self.cuda else "cpu"

@@ -1,4 +1,5 @@
 import argparse
+from pathlib import Path
 
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -42,12 +43,12 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "results_file",
-        type=str,
+        type=Path,
         help="BR results .csv file.",
     )
     parser.add_argument(
         "--save_path",
-        type=str,
+        type=Path,
         default=None,
         help="Path to save plot too.",
     )

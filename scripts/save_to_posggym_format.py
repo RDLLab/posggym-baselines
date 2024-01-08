@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 import argparse
-import os
 import pickle
+from pathlib import Path
 
 import torch
 
@@ -32,15 +32,12 @@ def format_checkpoint(checkpoint):
     )
 
 
-def format_checkpoint_dir(checkpoint_dir: str, output_dir: str | None = None):
+def format_checkpoint_dir(checkpoint_dir: Path, output_dir: Path | None = None):
     """Converts a directory of saved models to the POSGGym format."""
     if output_dir is None:
         output_dir = checkpoint_dir
 
-    all_files = os.listdir(checkpoint_dir)
-    checkpoint_files = [
-        f for f in all_files if f.startswith("checkpoint") and f.endswith(".pt")
-    ]
+    checkpoint_files = list(checkpoint_dir.glob("checkpoint*.pt"))
     if not checkpoint_files:
         raise ValueError(f"No checkpoint files found in {checkpoint_dir}")
 
@@ -54,10 +51,10 @@ def format_checkpoint_dir(checkpoint_dir: str, output_dir: str | None = None):
         if tokens[1] != str(checkpoint_num):
             continue
         policy_id = "_".join(tokens[2:-1] + tokens[-1].split(".")[:1])
-        policy_checkpoint_files[policy_id] = os.path.join(checkpoint_dir, f)
+        policy_checkpoint_files[policy_id] = checkpoint_dir / f
 
     for policy_id, checkpoint_file in policy_checkpoint_files.items():
-        save_path = os.path.join(output_dir, f"{policy_id}.pkl")
+        save_path = output_dir / f"{policy_id}.pkl"
 
         checkpoint = torch.load(checkpoint_file)
         formatted_checkpoint = format_checkpoint(checkpoint)
@@ -73,12 +70,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "checkpoint_dir",
-        type=str,
+        type=Path,
         help="Directory containing checkpoint files",
     )
     parser.add_argument(
         "--output_dir",
-        type=str,
+        type=Path,
         default=None,
         help="Directory to save reformatted models too. Defaults to checkpoint_dir",
     )

@@ -97,7 +97,7 @@ class BeliefRejectionSampler:
         joint_update_fn: Callable,
         **kwargs,
     ):
-        """Reinvigorate belief given action performed and observation recieved.
+        """Reinvigorate belief given action performed and observation received.
 
         In general this involves adding additional particles to the belief that
         are consistent with the action and observation.
@@ -111,7 +111,7 @@ class BeliefRejectionSampler:
         action
             Action performed by agent
         obs
-            The observation recieved by agent
+            The observation received by agent
         num_particles
             the number of additional particles to sample
         parent_belief

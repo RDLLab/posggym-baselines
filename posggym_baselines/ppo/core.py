@@ -1,10 +1,10 @@
 """The core PPO learner."""
 import contextlib
-import os
 import time
 from datetime import timedelta
 from multiprocessing.queues import Empty, Full
 from typing import TYPE_CHECKING, Dict, List, Optional, Union
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -421,7 +421,7 @@ class PPOLearner:
             for policy_id, policy in self.policies.items()
         }
         # queue up next eval, queue may be full if enough of previous evals
-        # havn't finished, in which case wait for one to finish (to avoid
+        # haven't finished, in which case wait for one to finish (to avoid
         # excessive memory usage, default maxsize=100)
         reported_wait = False
         print(f"learner: Starting eval for global_step={global_step} {final_eval=}")
@@ -487,9 +487,7 @@ class PPOLearner:
                     "update": update,
                     "config": self.config.aspickleable(),
                 },
-                os.path.join(
-                    self.config.log_dir, f"checkpoint_{update}_{policy_id}.pt"
-                ),
+                self.config.log_dir / f"checkpoint_{update}_{policy_id}.pt",
             )
 
     def close(self):
@@ -498,7 +496,7 @@ class PPOLearner:
 
 def load_policies(
     config: "PPOConfig",
-    save_dir: str,
+    save_dir: Path,
     checkpoint: Optional[int] = None,
     device: Optional[Union[str, torch.device]] = None,
 ) -> Dict[str, PPOModel]:
@@ -506,7 +504,7 @@ def load_policies(
 
     If checkpoint is None, load the latest checkpoint.
     """
-    all_files = os.listdir(save_dir)
+    all_files = save_dir.glob("*")
     checkpoint_files = [
         f for f in all_files if f.startswith("checkpoint") and f.endswith(".pt")
     ]
@@ -523,7 +521,7 @@ def load_policies(
         if tokens[1] != str(checkpoint):
             continue
         policy_id = "_".join(tokens[2:-1] + tokens[-1].split(".")[:1])
-        policy_checkpoint_files[policy_id] = os.path.join(save_dir, f)
+        policy_checkpoint_files[policy_id] = save_dir / f
 
     device = device or config.device
     policies = config.load_policies(device=device)

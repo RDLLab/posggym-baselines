@@ -1,21 +1,20 @@
 import argparse
-import os
 import shutil
+from pathlib import Path
 
 
 def main(args):
-    model_parent_dir = args.model_parent_dir
-    output_dir = args.output_dir
+    model_parent_dir: Path = args.model_parent_dir
+    output_dir: Path = args.output_dir
 
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+    output_dir.mkdir(exist_ok=True)
 
     env_id = None
     added_models = set()
     old_to_new_paths = {}
-    for model_dir in os.listdir(model_parent_dir):
-        model_dir_path = os.path.join(model_parent_dir, model_dir)
-        if not os.path.isdir(model_dir_path):
+    for model_dir in model_parent_dir.glob("*"):
+        model_dir_path = model_parent_dir / model_dir
+        if not model_dir_path.is_dir():
             continue
 
         # format: <exp_name>_<pop_id>[_<agent_id>]_<env_id>_<seed>_<date>_<time>
@@ -43,12 +42,11 @@ def main(args):
 
         seed = int(tokens[env_idx + 1])
 
-        checkpoint_names = [
-            fname for fname in os.listdir(model_dir_path) if fname.endswith("BR.pt")
-        ]
+        checkpoint_names = list(model_dir_path.glob("*BR.pt"))
+
         assert len(checkpoint_names) >= 1
         checkpoint_names.sort()
-        checkpoint_path = os.path.join(model_dir_path, checkpoint_names[-1])
+        checkpoint_path = model_dir_path / checkpoint_names[-1]
 
         if agent_id is None:
             new_name = f"{pop_id}_seed{seed}.pt"
@@ -57,7 +55,7 @@ def main(args):
 
         assert new_name not in added_models
         added_models.add(new_name)
-        new_path = os.path.join(output_dir, new_name)
+        new_path = output_dir / new_name
         old_to_new_paths[checkpoint_path] = new_path
 
     for checkpoint_path, new_path in old_to_new_paths.items():
@@ -73,11 +71,11 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--model_parent_dir",
-        type=str,
+        type=Path,
         help="Parent directory containing model directories to be extracted.",
     )
     parser.add_argument(
-        "--output_dir", type=str, help="Directory to save extracted models."
+        "--output_dir", type=Path, help="Directory to save extracted models."
     )
     parser.add_argument(
         "--agent_id", type=str, default=None, help="Agent ID to extract."

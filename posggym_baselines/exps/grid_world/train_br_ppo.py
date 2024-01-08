@@ -5,6 +5,7 @@ import argparse
 from typing import Callable, Optional
 import yaml
 from copy import deepcopy
+from pathlib import Path
 
 import posggym
 from posggym.agents.wrappers import AgentEnvWrapper
@@ -224,12 +225,12 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--env_kwargs_file",
-        type=str,
+        type=Path,
         help="Path to YAML file containing env kwargs.",
     )
     parser.add_argument(
         "--other_agents_file",
-        type=str,
+        type=Path,
         help="Path to YAML file containing other agent policy ids map.",
     )
     parser.add_argument(
@@ -288,7 +289,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--saved_model_dir",
-        type=str,
+        type=Path,
         default=None,
         help="Directory containing saved models (required if running render).",
     )

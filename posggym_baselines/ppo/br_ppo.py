@@ -3,8 +3,8 @@
 This module implements the Best-Response PPO (BR-PPO) training which trains a single
 PPO policy against a distribution of fixed other agents.
 
-It assumes the environment is a POSGGym environment that is wrapped using the 
-`posggym.agents.wrappers.AgentEnvWrapper` wrapper, so that the fixed other agent 
+It assumes the environment is a POSGGym environment that is wrapped using the
+`posggym.agents.wrappers.AgentEnvWrapper` wrapper, so that the fixed other agent
 distribution is part of the environment.
 
 """

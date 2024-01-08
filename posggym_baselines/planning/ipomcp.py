@@ -21,8 +21,8 @@ class IPOMCP(MCTS):
 
     CI-I-POMCP extends I-POMCP to environments with explicit communication and uses
     either an offline solver for the lower level models or a nested MCTS approach. The
-    nested MCTS approach is equivelent to I-NTMCP (implemented in a seperate file),
-    while this implemntation is equivalent to the offline solver approach but where the
+    nested MCTS approach is equivalent to I-NTMCP (implemented in a separate file),
+    while this implementation is equivalent to the offline solver approach but where the
     other agent policies can be arbitrary.
 
     """

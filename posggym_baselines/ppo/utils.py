@@ -92,7 +92,7 @@ def filter_batch_by_partner(
     -------
     filtered_batch:
         The batch with experience against given partners removed. If all experience
-        is removed (i.e. all data in batch is with exluded partners), an empty
+        is removed (i.e. all data in batch is with excluded partners), an empty
         dictionary will be returned.
 
     """
@@ -148,7 +148,7 @@ def filter_policy_batches_by_partner_dist(
     -------
     filtered_policy_batches:
         The policy batches with experience against given partners removed. If all
-        experience is removed (i.e. all data in batch is with exluded partners), an
+        experience is removed (i.e. all data in batch is with excluded partners), an
         empty dictionary will be returned.
 
     """
