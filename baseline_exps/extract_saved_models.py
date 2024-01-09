@@ -12,13 +12,12 @@ def main(args):
     env_id = None
     added_models = set()
     old_to_new_paths = {}
-    for model_dir in model_parent_dir.glob("*"):
-        model_dir_path = model_parent_dir / model_dir
+    for model_dir_path in model_parent_dir.glob("*"):
         if not model_dir_path.is_dir():
             continue
 
         # format: <exp_name>_<pop_id>[_<agent_id>]_<env_id>_<seed>_<date>_<time>
-        tokens = model_dir.split("_")
+        tokens = model_dir_path.name.split("_")
 
         pop_idx = [i for i, token in enumerate(tokens) if token in ("P0", "P1")][0]
         pop_id = tokens[pop_idx]
@@ -32,7 +31,7 @@ def main(args):
         if args.agent_id is not None:
             assert agent_id is not None
             if agent_id[1:] != args.agent_id:
-                print(f"Skipping {model_dir} since wrong agent ID")
+                print(f"Skipping {model_dir_path.name} since wrong agent ID")
                 continue
 
         if env_id is None:
@@ -42,11 +41,10 @@ def main(args):
 
         seed = int(tokens[env_idx + 1])
 
-        checkpoint_names = list(model_dir_path.glob("*BR.pt"))
+        checkpoint_names = model_dir_path.glob("*BR.pt")
 
         assert len(checkpoint_names) >= 1
-        checkpoint_names.sort()
-        checkpoint_path = model_dir_path / checkpoint_names[-1]
+        checkpoint_path = max(checkpoint_names, key=lambda x: x.name)
 
         if agent_id is None:
             new_name = f"{pop_id}_seed{seed}.pt"

@@ -92,14 +92,14 @@ class TensorBoardLogger(Logger):
             import wandb
 
             video_filenames = list(self.config.video_dir.glob("*.mp4"))
-            video_filenames.sort()
+            video_filenames.sort(key=lambda x: x.name)
             for filename in video_filenames:
                 if filename not in self.uploaded_video_files:
                     print(f"{self.__class__.__name__} Uploading video {filename}")
                     wandb.log(  # type:ignore
                         {
                             "video": wandb.Video(  # type:ignore
-                                self.config.video_dir / filename
+                                filename
                             )
                         },
                     )

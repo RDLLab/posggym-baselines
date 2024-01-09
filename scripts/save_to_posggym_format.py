@@ -42,16 +42,16 @@ def format_checkpoint_dir(checkpoint_dir: Path, output_dir: Path | None = None):
         raise ValueError(f"No checkpoint files found in {checkpoint_dir}")
 
     # Sort by checkpoint number, and get latest one
-    checkpoint_files = sorted(checkpoint_files)
-    checkpoint_num = int(checkpoint_files[-1].split("_")[1])
+    checkpoint_files = sorted(checkpoint_files, key=lambda x: x.name)
+    checkpoint_num = int(checkpoint_files.name[-1].split("_")[1])
 
     policy_checkpoint_files = {}
     for f in checkpoint_files:
-        tokens = f.split("_")
+        tokens = f.name.split("_")
         if tokens[1] != str(checkpoint_num):
             continue
         policy_id = "_".join(tokens[2:-1] + tokens[-1].split(".")[:1])
-        policy_checkpoint_files[policy_id] = checkpoint_dir / f
+        policy_checkpoint_files[policy_id] = f
 
     for policy_id, checkpoint_file in policy_checkpoint_files.items():
         save_path = output_dir / f"{policy_id}.pkl"

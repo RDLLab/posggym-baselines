@@ -170,8 +170,8 @@ def get_env_data(env_id: str, agent_id: Optional[str]):
     # RL Data
     br_models_dir = env_data_path / "br_models"
     br_model_files = {"P0": {}, "P1": {}}
-    for model_file_name in br_models_dir.glob("*"):
-        model_name = model_file_name.replace(".pt", "")
+    for model_file_name in br_models_dir.glob("*.pt"):
+        model_name = model_file_name.with_suffix("").name
         tokens = model_name.split("_")
         train_pop = tokens[0]
         if agent_id is not None:
@@ -180,7 +180,7 @@ def get_env_data(env_id: str, agent_id: Optional[str]):
             seed = int(tokens[2].replace("seed", ""))
         else:
             seed = int(tokens[1].replace("seed", ""))
-        br_model_files[train_pop][seed] = br_models_dir / model_file_name
+        br_model_files[train_pop][seed] = br_models_dir
 
     # Planninn Data
     meta_policy_file = env_data_path / "meta_policy.yaml"
@@ -210,7 +210,7 @@ def get_env_data(env_id: str, agent_id: Optional[str]):
 def load_all_env_data() -> Dict[str, EnvData]:
     """Load data for all environments."""
     all_env_data = {}
-    full_env_ids = sorted(ENV_DATA_DIR.glob("*"))
+    full_env_ids = sorted([f.name for f in ENV_DATA_DIR.glob("*")])
     for full_env_id in full_env_ids:
         if not (ENV_DATA_DIR / full_env_id).is_dir():
             continue

@@ -504,20 +504,17 @@ def load_policies(
 
     If checkpoint is None, load the latest checkpoint.
     """
-    all_files = save_dir.glob("*")
-    checkpoint_files = [
-        f for f in all_files if f.startswith("checkpoint") and f.endswith(".pt")
-    ]
+    checkpoint_files = save_dir.glob("checkpoint*.pt")
     if not checkpoint_files:
         raise ValueError(f"No checkpoint files found in {save_dir}")
 
     if not checkpoint:
-        checkpoint_files = sorted(checkpoint_files)
+        checkpoint_files = sorted(checkpoint_files, key=lambda x: x.name)
         checkpoint = int(checkpoint_files[-1].split("_")[1])
 
     policy_checkpoint_files = {}
     for f in checkpoint_files:
-        tokens = f.split("_")
+        tokens = f.name.split("_")
         if tokens[1] != str(checkpoint):
             continue
         policy_id = "_".join(tokens[2:-1] + tokens[-1].split(".")[:1])

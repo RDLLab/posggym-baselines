@@ -378,8 +378,9 @@ if __name__ == "__main__":
 
     if args.env_id == "all":
         print("Running all envs")
-        for env_id in exp_utils.ENV_DATA_DIR.glob("*"):
-            if not (exp_utils.ENV_DATA_DIR / env_id).is_dir():
+        for env_id_folder in exp_utils.ENV_DATA_DIR.glob("*"):
+            env_id = env_id_folder.name
+            if not env_id_folder.is_dir():
                 continue
             if env_id.endswith("_i0"):
                 agent_id = "0"

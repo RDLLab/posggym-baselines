@@ -90,7 +90,7 @@ def get_env_data(env_id, agent_id):
 
     br_model_files = {"P0": {}, "P1": {}}
     for model_file_name in br_models_dir.glob("*"):
-        model_name = model_file_name.replace(".pt", "")
+        model_name = model_file_name.name.replace(".pt", "")
         tokens = model_name.split("_")
         train_pop = tokens[0]
         if agent_id is not None:
@@ -330,7 +330,8 @@ if __name__ == "__main__":
 
     if args.env_id == "all":
         print("Running all envs")
-        for env_id in ENV_DATA_DIR.glob("*"):
+        for env_id_folder in ENV_DATA_DIR.glob("*"):
+            env_id = env_id_folder.name
             if env_id == "Driving-v1":
                 continue
             if env_id.endswith("_i0"):
