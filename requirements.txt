@@ -1,0 +1,16 @@
+clint==0.5.1
+gymnasium==0.29.1
+matplotlib==3.7.3
+moviepy==1.0.3
+networkx==3.1
+numpy==1.24.4
+pygame==2.5.2
+pymunk==6.5.2
+pandas==2.0.3
+psutil==5.9.6
+requests==2.31.0
+seaborn==0.13.0
+tensorboard==2.14.0
+types-requests==2.31.0.10
+typing_extensions==4.8.0
+wandb==0.15.12

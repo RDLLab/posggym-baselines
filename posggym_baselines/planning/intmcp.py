@@ -275,7 +275,7 @@ class INTMCP:
 
     def _nested_update(self, history_dist: Dict[AgentHistory, float], current_t: int):
         self._log_debug("Pruning unused nodes from tree")
-        # traverse all nodes in tree upto current step
+        # traverse all nodes in tree up to current step
         for action_node in self.root.get_child_nodes():
             for obs_node in action_node.get_child_nodes():
                 h = AgentHistory(((action_node.action, obs_node.obs),))

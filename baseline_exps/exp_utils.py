@@ -12,10 +12,10 @@ import posggym
 import psutil
 import yaml
 from posggym.agents.wrappers import AgentEnvWrapper
+
 from posggym_baselines.planning.config import MCTSConfig
 from posggym_baselines.planning.utils import PlanningStatTracker
 from posggym_baselines.utils.agent_env_wrapper import UniformOtherAgentFn
-
 
 BASELINE_EXP_DIR = Path(__file__).resolve().parent
 ENV_DATA_DIR = BASELINE_EXP_DIR / "env_data"
@@ -23,7 +23,7 @@ RESULTS_DIR = BASELINE_EXP_DIR / "results"
 
 RESULTS_DIR.mkdir(exist_ok=True)
 
-# Defaul parameters
+# Default parameters
 DEFAULT_SEARCH_TIMES = [0.1, 1.0, 5.0, 10.0, 20.0]
 DEFAULT_NUM_EPISODES = 500
 DEFAULT_EXP_TIME_LIMIT = 60 * 60 * 48  # 48 hours

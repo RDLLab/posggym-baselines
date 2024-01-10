@@ -105,7 +105,7 @@ class ObsNode(Node):
             f"\nv={self.value:.2f}"
             f"\nn={self.visits}"
             f"\nt={self.t}"
-            f"\nd={self.is_absorbing}"
+            f"\ndone={self.is_absorbing}"
             f"\n|B|={self.belief.size()}"
             f"\npi={self.policy_str()}"
         )
