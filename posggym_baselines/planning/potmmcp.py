@@ -370,8 +370,8 @@ class POTMMCPMetaPolicy(SearchPolicy):
     def get_pi(self, state: PolicyState) -> Dict[M.ActType, float]:
         raise NotImplementedError(
             "POTMMCPMetaPolicy does not support action sampling. Instead, use "
-            "sample_policy to sample a policy and then get the action distribution from "
-            "that."
+            "sample_policy to sample a policy and then get the action distribution "
+            "from that."
         )
 
     def get_value(self, state: PolicyState) -> float:

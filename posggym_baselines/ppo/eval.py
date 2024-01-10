@@ -44,7 +44,7 @@ def run_eval_worker(
     config: BaseConfig
         The configuration for this rollout worker.
     recv_queue: mp.Queue
-        The queue from which to recieve the policy weights, etc from the learner.
+        The queue from which to receive the policy weights, etc from the learner.
     send_queue: mp.Queue
         The queue to which to send the collected trajectories to the learner.
     terminate_event: mp.Event

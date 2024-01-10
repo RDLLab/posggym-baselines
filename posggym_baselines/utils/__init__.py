@@ -1,5 +1,6 @@
 import uuid
 import os
+from pathlib import Path
 
 import posggym
 from posggym.wrappers import RecordVideo
@@ -25,7 +26,8 @@ def strtobool(val: str) -> bool:
 class NoOverwriteRecordVideo(RecordVideo):
     """Record video without overwriting existing videos."""
 
-    def __init__(self, env: posggym.Env, video_folder: str, **kwargs):
-        if os.path.exists(video_folder):
-            video_folder = os.path.join(video_folder, str(uuid.uuid4()))
+    def __init__(self, env: posggym.Env, video_folder: Path, **kwargs):
+        if video_folder.exists():
+            video_folder = video_folder / str(uuid.uuid4())
+
         super().__init__(env, video_folder, **kwargs)

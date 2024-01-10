@@ -4,6 +4,7 @@ import argparse
 from typing import Callable, Optional
 import yaml
 from copy import deepcopy
+from pathlib import Path
 
 import posggym
 from posggym.wrappers import FlattenObservations, RecordVideo
@@ -308,7 +309,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--env_kwargs_file",
-        type=str,
+        type=Path,
         default=None,
         help="Path to YAML file containing env kwargs.",
     )
@@ -374,7 +375,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--saved_model_dir",
-        type=str,
+        type=Path,
         default=None,
         help="Directory containing saved models (required if running eval).",
     )

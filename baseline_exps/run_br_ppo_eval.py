@@ -2,12 +2,12 @@
 import argparse
 import csv
 import math
-import os
 import time
 from copy import deepcopy
 from itertools import product
 from pprint import pprint
 from typing import Callable, Dict, Optional, Tuple
+from pathlib import Path
 
 import numpy as np
 import posggym
@@ -21,7 +21,7 @@ from posggym_baselines.ppo.br_ppo import BRPPOConfig
 from posggym_baselines.ppo.network import PPOModel
 from posggym_baselines.utils import NoOverwriteRecordVideo, strtobool
 
-ENV_DATA_DIR = os.path.join(os.path.dirname(__file__), "env_data")
+ENV_DATA_DIR = Path(__file__).resolve().parent / "env_data"
 
 
 def get_env_creator_fn(
@@ -64,33 +64,33 @@ def get_env_creator_fn(
 def get_env_data(env_id, agent_id):
     """Get the env data for the given env name."""
     if agent_id is None:
-        env_data_path = os.path.join(ENV_DATA_DIR, env_id)
+        env_data_path = ENV_DATA_DIR / env_id
     else:
-        env_data_path = os.path.join(ENV_DATA_DIR, f"{env_id}_{agent_id}")
+        env_data_path = ENV_DATA_DIR / f"{env_id}_{agent_id}"
 
-    env_kwargs_file = os.path.join(env_data_path, "env_kwargs.yaml")
+    env_kwargs_file = env_data_path / "env_kwargs.yaml"
     with open(env_kwargs_file, "r") as f:
         env_kwargs = yaml.safe_load(f)
 
-    agents_P0_file = os.path.join(
-        env_data_path,
-        "agents_P0.yaml" if agent_id is None else f"agents_P0_{agent_id}.yaml",
+    agents_P0_file = env_data_path / (
+        "agents_P0.yaml" if agent_id is None else f"agents_P0_{agent_id}.yaml"
     )
+
     with open(agents_P0_file, "r") as f:
         agents_P0 = yaml.safe_load(f)
 
-    agents_P1_file = os.path.join(
-        env_data_path,
-        "agents_P1.yaml" if agent_id is None else f"agents_P1_{agent_id}.yaml",
+    agents_P1_file = env_data_path / (
+        "agents_P1.yaml" if agent_id is None else f"agents_P1_{agent_id}.yaml"
     )
+
     with open(agents_P1_file, "r") as f:
         agents_P1 = yaml.safe_load(f)
 
-    br_models_dir = os.path.join(env_data_path, "br_models")
+    br_models_dir = env_data_path / "br_models"
 
     br_model_files = {"P0": {}, "P1": {}}
-    for model_file_name in os.listdir(br_models_dir):
-        model_name = model_file_name.replace(".pt", "")
+    for model_file_name in br_models_dir.glob("*"):
+        model_name = model_file_name.name.replace(".pt", "")
         tokens = model_name.split("_")
         train_pop = tokens[0]
         if agent_id is not None:
@@ -99,10 +99,9 @@ def get_env_data(env_id, agent_id):
             seed = int(tokens[2].replace("seed", ""))
         else:
             seed = int(tokens[1].replace("seed", ""))
-        br_model_files[train_pop][seed] = os.path.join(br_models_dir, model_file_name)
+        br_model_files[train_pop][seed] = br_models_dir / model_file_name
 
-    results_file = os.path.join(env_data_path, "br_results.csv")
-
+    results_file = env_data_path / "br_results.csv"
     return env_kwargs, agents_P0, agents_P1, br_model_files, results_file
 
 
@@ -331,7 +330,8 @@ if __name__ == "__main__":
 
     if args.env_id == "all":
         print("Running all envs")
-        for env_id in os.listdir(ENV_DATA_DIR):
+        for env_id_folder in ENV_DATA_DIR.glob("*"):
+            env_id = env_id_folder.name
             if env_id == "Driving-v1":
                 continue
             if env_id.endswith("_i0"):

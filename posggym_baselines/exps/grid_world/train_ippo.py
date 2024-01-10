@@ -1,12 +1,11 @@
 """Independent PPO (IPPO) training for POSGGym grid world environments"""
 import uuid
-import os
 import math
 import argparse
 from typing import Callable, Optional
 import yaml
 from copy import deepcopy
-
+from pathlib import Path
 import posggym
 from posggym.wrappers import FlattenObservations, RecordVideo
 import seaborn as sns
@@ -74,9 +73,9 @@ DEFAULT_CONFIG = {
 class NoOverwriteRecordVideo(RecordVideo):
     """Record video without overwriting existing videos."""
 
-    def __init__(self, env: posggym.Env, video_folder: str, **kwargs):
-        if os.path.exists(video_folder):
-            video_folder = os.path.join(video_folder, str(uuid.uuid4()))
+    def __init__(self, env: posggym.Env, video_folder: Path, **kwargs):
+        if video_folder.exists():
+            video_folder = video_folder / str(uuid.uuid4())
         super().__init__(env, video_folder, **kwargs)
 
 
@@ -331,7 +330,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--env_kwargs_file",
-        type=str,
+        type=Path,
         default=None,
         help="Path to YAML file containing env kwargs.",
     )
@@ -397,7 +396,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--saved_model_dir",
-        type=str,
+        type=Path,
         default=None,
         help="Directory containing saved models (required if running eval).",
     )

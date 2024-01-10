@@ -1,13 +1,13 @@
 """Script for running POTMMCP baseline experiments.
 
-Specifically, for a given baseline environment and population (P0, P1) and mode 
+Specifically, for a given baseline environment and population (P0, P1) and mode
 (in-distribution, out-of-distribution), run POTMMCP for `num_episodes` episodes for
 various search budgets and save the results to a file.
 
 
 in-distribution - planning agent is evaluated against the same population that it uses
     for planning
-out-of-distribution - planning agent is evaluated against different population to the 
+out-of-distribution - planning agent is evaluated against different population to the
     one it uses for planning
 
 """
@@ -15,11 +15,11 @@ import argparse
 import copy
 import itertools
 import multiprocessing as mp
-import os
 import pprint
 import time
 from datetime import datetime
 from typing import List
+from pathlib import Path
 
 import exp_utils
 import posggym
@@ -55,7 +55,7 @@ def init_intmcp(model: posggym.POSGModel, exp_params: PlanningExpParams) -> INTM
 
 
 def get_intmcp_exp_params(
-    args, env_data: exp_utils.EnvData, exp_name: str, exp_results_parent_dir: str
+    args, env_data: exp_utils.EnvData, exp_name: str, exp_results_parent_dir: Path
 ) -> List[PlanningExpParams]:
     config_kwargs = dict(exp_utils.DEFAULT_PLANNING_CONFIG_KWARGS_UCB)
     config_kwargs["truncated"] = False
@@ -109,7 +109,7 @@ def init_ipomcp(model: posggym.POSGModel, exp_params: PlanningExpParams) -> IPOM
 
 
 def get_ipomcp_exp_params(
-    args, env_data: exp_utils.EnvData, exp_name: str, exp_results_parent_dir: str
+    args, env_data: exp_utils.EnvData, exp_name: str, exp_results_parent_dir: Path
 ) -> List[PlanningExpParams]:
     config_kwargs = dict(exp_utils.DEFAULT_PLANNING_CONFIG_KWARGS_UCB)
     config_kwargs["truncated"] = False
@@ -160,7 +160,7 @@ def init_pomcp(model: posggym.POSGModel, exp_params: PlanningExpParams) -> POMCP
 
 
 def get_pomcp_exp_params(
-    args, env_data: exp_utils.EnvData, exp_name: str, exp_results_parent_dir: str
+    args, env_data: exp_utils.EnvData, exp_name: str, exp_results_parent_dir: Path
 ) -> List[PlanningExpParams]:
     config_kwargs = dict(exp_utils.DEFAULT_PLANNING_CONFIG_KWARGS_UCB)
     config_kwargs["truncated"] = False
@@ -216,7 +216,7 @@ def init_potmmcp(model: posggym.POSGModel, exp_params: PlanningExpParams) -> POT
 
 
 def get_potmmcp_exp_params(
-    args, env_data: exp_utils.EnvData, exp_name: str, exp_results_parent_dir: str
+    args, env_data: exp_utils.EnvData, exp_name: str, exp_results_parent_dir: Path
 ) -> List[PlanningExpParams]:
     all_exp_params = []
     exp_num = 0
@@ -282,9 +282,8 @@ def main(args):
         exp_name += f"_i{args.agent_id}"
     exp_name += f"_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
-    exp_results_parent_dir = os.path.join(exp_utils.RESULTS_DIR, exp_name)
-    if not os.path.exists(exp_results_parent_dir):
-        os.makedirs(exp_results_parent_dir)
+    exp_results_parent_dir = exp_utils.RESULTS_DIR / exp_name
+    exp_results_parent_dir.mkdir(exist_ok=True)
 
     if args.alg_name == "INTMCP":
         all_exp_params = get_intmcp_exp_params(
@@ -379,8 +378,9 @@ if __name__ == "__main__":
 
     if args.env_id == "all":
         print("Running all envs")
-        for env_id in os.listdir(exp_utils.ENV_DATA_DIR):
-            if not os.path.isdir(os.path.join(exp_utils.ENV_DATA_DIR, env_id)):
+        for env_id_folder in exp_utils.ENV_DATA_DIR.glob("*"):
+            env_id = env_id_folder.name
+            if not env_id_folder.is_dir():
                 continue
             if env_id.endswith("_i0"):
                 agent_id = "0"

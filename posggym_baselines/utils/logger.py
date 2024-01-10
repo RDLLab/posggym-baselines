@@ -1,6 +1,5 @@
 """Classes and functions for handling logging."""
 import abc
-import os
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -92,19 +91,15 @@ class TensorBoardLogger(Logger):
         if self.config.capture_video and self.config.track_wandb:
             import wandb
 
-            video_filenames = [
-                fname
-                for fname in os.listdir(self.config.video_dir)
-                if fname.endswith(".mp4")
-            ]
-            video_filenames.sort()
+            video_filenames = list(self.config.video_dir.glob("*.mp4"))
+            video_filenames.sort(key=lambda x: x.name)
             for filename in video_filenames:
                 if filename not in self.uploaded_video_files:
                     print(f"{self.__class__.__name__} Uploading video {filename}")
                     wandb.log(  # type:ignore
                         {
                             "video": wandb.Video(  # type:ignore
-                                os.path.join(self.config.video_dir, filename)
+                                filename
                             )
                         },
                     )

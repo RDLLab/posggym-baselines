@@ -1,11 +1,12 @@
 import csv
 import math
-import os
 import pprint
 import time
+import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional
+from pathlib import Path
 
 import posggym
 import psutil
@@ -16,15 +17,13 @@ from posggym_baselines.planning.config import MCTSConfig
 from posggym_baselines.planning.utils import PlanningStatTracker
 from posggym_baselines.utils.agent_env_wrapper import UniformOtherAgentFn
 
-BASELINE_EXP_DIR = os.path.dirname(__file__)
-ENV_DATA_DIR = os.path.join(BASELINE_EXP_DIR, "env_data")
-RESULTS_DIR = os.path.join(BASELINE_EXP_DIR, "results")
+BASELINE_EXP_DIR = Path(__file__).resolve().parent
+ENV_DATA_DIR = BASELINE_EXP_DIR / "env_data"
+RESULTS_DIR = BASELINE_EXP_DIR / "results"
 
-if not os.path.exists(RESULTS_DIR):
-    os.makedirs(RESULTS_DIR)
+RESULTS_DIR.mkdir(exist_ok=True)
 
-
-# Defaul parameters
+# Default parameters
 DEFAULT_SEARCH_TIMES = [0.1, 1.0, 5.0, 10.0, 20.0]
 DEFAULT_NUM_EPISODES = 500
 DEFAULT_EXP_TIME_LIMIT = 60 * 60 * 48  # 48 hours
@@ -83,13 +82,13 @@ class EnvData:
     other_agent_id: str
     # env_kwargs contains `env_id` and `env_kwargs` keys
     env_kwargs: Dict[str, Dict[str, Any]]
-    env_data_dir: str
+    env_data_dir: Path
 
     # Population data
     # agent_id -> List[policy_id]
     agents_P0: Dict[str, List[str]]
     agents_P1: Dict[str, List[str]]
-    pop_div_results_file: str
+    pop_div_results_file: Path
     # policy names are shorthand for policy IDs
     # pop_id -> List[str]
     pop_policy_names: Dict[str, List[str]]
@@ -99,43 +98,43 @@ class EnvData:
 
     # RL data
     # [P0, P1] -> [seed] -> model_file
-    br_model_files: Dict[str, Dict[int, str]]
-    rl_br_results_file: str
+    br_model_files: Dict[str, Dict[int, Path]]
+    rl_br_results_file: Path
 
     # Planning data
     # Meta policy pop_id -> meta_policy_type -> meta_policy
     # [P0, P1] -> [greedy, softmax, uniform] -> meta_policy
     meta_policy: Dict[str, Dict[str, Dict[str, Dict[str, float]]]]
     # Experiment results
-    planning_results_file: str
-    planning_summary_results_file: str
+    planning_results_file: Path
+    planning_summary_results_file: Path
 
 
 def get_env_data(env_id: str, agent_id: Optional[str]):
     """Get the env data for the given env name."""
     if agent_id is None:
-        env_data_path = os.path.join(ENV_DATA_DIR, env_id)
+        env_data_path = ENV_DATA_DIR / env_id
         full_env_id = env_id
     else:
-        env_data_path = os.path.join(ENV_DATA_DIR, f"{env_id}_i{agent_id}")
+        env_data_path = ENV_DATA_DIR / f"{env_id}_i{agent_id}"
         full_env_id = f"{env_id}_i{agent_id}"
 
-    env_kwargs_file = os.path.join(env_data_path, "env_kwargs.yaml")
+    env_kwargs_file = env_data_path / "env_kwargs.yaml"
     with open(env_kwargs_file, "r") as f:
         env_kwargs = yaml.safe_load(f)
 
     # Population Data
-    agents_P0_file = os.path.join(
-        env_data_path,
-        "agents_P0.yaml" if agent_id is None else f"agents_P0_i{agent_id}.yaml",
+    agents_P0_file = env_data_path / (
+        "agents_P0.yaml" if agent_id is None else f"agents_P0_i{agent_id}.yaml"
     )
+
     with open(agents_P0_file, "r") as f:
         agents_P0 = yaml.safe_load(f)
 
-    agents_P1_file = os.path.join(
-        env_data_path,
-        "agents_P1.yaml" if agent_id is None else f"agents_P1_i{agent_id}.yaml",
+    agents_P1_file = env_data_path / (
+        "agents_P1.yaml" if agent_id is None else f"agents_P1_i{agent_id}.yaml"
     )
+
     with open(agents_P1_file, "r") as f:
         agents_P1 = yaml.safe_load(f)
 
@@ -169,10 +168,10 @@ def get_env_data(env_id: str, agent_id: Optional[str]):
             pop_co_team_names[pop_id] = policy_names
 
     # RL Data
-    br_models_dir = os.path.join(env_data_path, "br_models")
+    br_models_dir = env_data_path / "br_models"
     br_model_files = {"P0": {}, "P1": {}}
-    for model_file_name in os.listdir(br_models_dir):
-        model_name = model_file_name.replace(".pt", "")
+    for model_file_name in br_models_dir.glob("*.pt"):
+        model_name = model_file_name.with_suffix("").name
         tokens = model_name.split("_")
         train_pop = tokens[0]
         if agent_id is not None:
@@ -181,10 +180,10 @@ def get_env_data(env_id: str, agent_id: Optional[str]):
             seed = int(tokens[2].replace("seed", ""))
         else:
             seed = int(tokens[1].replace("seed", ""))
-        br_model_files[train_pop][seed] = os.path.join(br_models_dir, model_file_name)
+        br_model_files[train_pop][seed] = br_models_dir
 
     # Planninn Data
-    meta_policy_file = os.path.join(env_data_path, "meta_policy.yaml")
+    meta_policy_file = env_data_path / "meta_policy.yaml"
     with open(meta_policy_file, "r") as f:
         meta_policy = yaml.safe_load(f)
 
@@ -196,27 +195,24 @@ def get_env_data(env_id: str, agent_id: Optional[str]):
         env_data_dir=env_data_path,
         agents_P0=agents_P0,
         agents_P1=agents_P1,
-        pop_div_results_file=os.path.join(env_data_path, "div_results.csv"),
+        pop_div_results_file=env_data_path / "div_results.csv",
         pop_policy_names=pop_policy_names,
         pop_co_team_names=pop_co_team_names,
         policy_name_to_id=policy_name_to_id,
         br_model_files=br_model_files,
-        rl_br_results_file=os.path.join(env_data_path, "br_results.csv"),
+        rl_br_results_file=env_data_path / "br_results.csv",
         meta_policy=meta_policy,
-        planning_results_file=os.path.join(env_data_path, "planning_results.csv"),
-        planning_summary_results_file=os.path.join(
-            env_data_path, "planning_summary_results.csv"
-        ),
+        planning_results_file=env_data_path / "planning_results.csv",
+        planning_summary_results_file=env_data_path / "planning_summary_results.csv",
     )
 
 
 def load_all_env_data() -> Dict[str, EnvData]:
     """Load data for all environments."""
     all_env_data = {}
-    full_env_ids = os.listdir(ENV_DATA_DIR)
-    full_env_ids.sort()
+    full_env_ids = sorted([f.name for f in ENV_DATA_DIR.glob("*")])
     for full_env_id in full_env_ids:
-        if not os.path.isdir(os.path.join(ENV_DATA_DIR, full_env_id)):
+        if not (ENV_DATA_DIR / full_env_id).is_dir():
             continue
         tokens = full_env_id.split("_")
         if len(tokens) == 1:
@@ -251,14 +247,14 @@ class PlanningExpParams:
     # experiment details for saving results
     exp_name: str
     exp_num: int
-    exp_results_parent_dir: str
+    exp_results_parent_dir: Path
     planning_pop_id: str
     test_pop_id: str
 
-    exp_results_dir: str = field(init=False)
+    exp_results_dir: Path = field(init=False)
     episode_results_file: str = field(init=False)
-    exp_args_file: str = field(init=False)
-    exp_log_file: str = field(init=False)
+    exp_args_file: Path = field(init=False)
+    exp_log_file: Path = field(init=False)
     episode_results_heads: List[str] = field(init=False)
     exp_start_time: float = field(init=False)
 
@@ -269,16 +265,15 @@ class PlanningExpParams:
         else:
             search_time_str = f"{search_time:.0f}"
 
-        self.exp_results_dir = os.path.join(
-            self.exp_results_parent_dir,
-            f"{self.exp_num}_{self.planning_pop_id}_{self.test_pop_id}_{search_time_str}",
+        self.exp_results_dir = (
+            self.exp_results_parent_dir
+            / f"{self.exp_num}_{self.planning_pop_id}_{self.test_pop_id}_"
+            f"{search_time_str}"
         )
 
-        self.episode_results_file = os.path.join(
-            self.exp_results_dir, "episode_results.csv"
-        )
-        self.exp_args_file = os.path.join(self.exp_results_dir, "exp_args.yaml")
-        self.exp_log_file = os.path.join(self.exp_results_dir, "exp_log.txt")
+        self.episode_results_file = self.exp_results_dir / "episode_results.csv"
+        self.exp_args_file = self.exp_results_dir / "exp_args.yaml"
+        self.exp_log_file = self.exp_results_dir / "exp_log.txt"
 
         self.episode_results_heads = [
             "num",
@@ -291,12 +286,11 @@ class PlanningExpParams:
     def setup_exp(self):
         """Runs necessary setup for experiment.
 
-        I.e. setup results directy, files, logging, etc
+        I.e. setup results directly, files, logging, etc
         """
         self.exp_start_time = time.time()
 
-        if not os.path.exists(self.exp_results_dir):
-            os.makedirs(self.exp_results_dir)
+        self.exp_results_dir.mkdir(exist_ok=True)
 
         exp_args = {
             "exp_num": self.exp_num,

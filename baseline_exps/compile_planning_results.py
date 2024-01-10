@@ -1,10 +1,10 @@
 """Script for compiling planning experiment results.
 
 The experiment for each planning algorithm will produce a directory containing a
-results directory for each (planning pop, testin pop, search time) sub-experiment. Each
+results directory for each (planning pop, testing pop, search time) sub-experiment. Each
 results directory contains `episode_results.csv` and `exp_args.yaml` files. This script
 combines the results from all sub-experiments into a single `planning_results.csv` file.
-It may also be used to combine results from multiple experiments (i.e. multiple 
+It may also be used to combine results from multiple experiments (i.e. multiple
 algorithms and/or environments) into a single file.
 
 Script has two modes:
@@ -18,7 +18,6 @@ Script has two modes:
 
 """
 import argparse
-import os.path as osp
 from pathlib import Path
 from typing import Dict
 
@@ -28,7 +27,7 @@ from exp_utils import ENV_DATA_DIR
 
 
 def compile_sub_experiment_results(
-    parent_dir: str, save_to_file: bool = True, summarize: bool = True
+    parent_dir: Path, save_to_file: bool = True, summarize: bool = True
 ) -> pd.DataFrame:
     """Compile results from all sub-experiments of (alg, env) into a single file.
 
@@ -107,7 +106,7 @@ def compile_sub_experiment_results(
 
 
 def combine_all_experiment_results(
-    parent_dir: str,
+    parent_dir: Path,
     save_to_file: bool = True,
     summarize: bool = True,
     save_to_main_results_dir: bool = False,
@@ -175,7 +174,7 @@ def combine_all_experiment_results(
 
         for env_id in combined_results:
             if save_to_main_results_dir:
-                env_save_file = osp.join(ENV_DATA_DIR, env_id, save_file_suffix)
+                env_save_file = ENV_DATA_DIR / env_id / save_file_suffix
             else:
                 env_save_file = parent_dir / f"{env_id}_{save_file_suffix}"
             print(f"Saving results to {env_save_file}")
@@ -197,7 +196,7 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "exp_results_parent_dirs",
-        type=str,
+        type=Path,
         nargs="+",
         help="Path to parent directory (or multiple) containing experiment results.",
     )

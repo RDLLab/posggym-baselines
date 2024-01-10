@@ -5,7 +5,6 @@ Each experiment is run as a separate subprocess.
 import argparse
 import itertools
 import multiprocessing as mp
-import os
 import time
 from datetime import datetime
 
@@ -45,9 +44,8 @@ def main(args):
             exp_name += f"_i{agent_id}"
         exp_name += f"_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
-        exp_results_parent_dir = os.path.join(exp_utils.RESULTS_DIR, exp_name)
-        if not os.path.exists(exp_results_parent_dir):
-            os.makedirs(exp_results_parent_dir)
+        exp_results_parent_dir = exp_utils.RESULTS_DIR / exp_name
+        exp_results_parent_dir.mkdir(exist_ok=True)
 
         if alg_name == "INTMCP":
             exp_params = planning_exps.get_intmcp_exp_params(
