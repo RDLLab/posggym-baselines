@@ -14,7 +14,7 @@ class MCTSConfig:
     c: float
     truncated: bool
     action_selection: str = "pucb"
-    root_exploration_fraction: float = 0.25
+    pucb_exploration_fraction: float = 0.25
     known_bounds: Optional[KnownBounds] = None
     extra_particles_prop: float = 1.0 / 16
     step_limit: Optional[int] = None
@@ -34,8 +34,8 @@ class MCTSConfig:
         assert self.search_time_limit > 0.0
         assert self.c > 0.0
         assert (
-            self.root_exploration_fraction >= 0.0
-            and self.root_exploration_fraction <= 1.0
+            self.pucb_exploration_fraction >= 0.0
+            and self.pucb_exploration_fraction <= 1.0
         )
         assert self.extra_particles_prop >= 0.0 and self.extra_particles_prop <= 1.0
         assert self.epsilon > 0.0 and self.epsilon < 1.0

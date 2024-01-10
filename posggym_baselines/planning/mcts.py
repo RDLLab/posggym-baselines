@@ -7,6 +7,7 @@ from typing import Dict, Optional, Tuple, Union
 import gymnasium as gym
 import numpy as np
 import posggym.model as M
+import psutil
 from posggym.agents.policy import Policy, PolicyState
 from posggym.utils.history import JointHistory
 
@@ -54,7 +55,7 @@ class MCTS:
         elif model.spec is not None:
             self.step_limit = model.spec.max_episode_steps
         else:
-            self.step_limit = None
+            self.step_limit = float("inf")
 
         self._reinvigorator = B.BeliefRejectionSampler(
             model, config.state_belief_only, sample_limit=4 * self.config.num_particles
@@ -92,7 +93,7 @@ class MCTS:
     #######################################################
 
     def step(self, obs: M.ObsType) -> M.ActType:
-        assert self.step_limit is None or self.root.t <= self.step_limit
+        assert self.root.t <= self.step_limit
         if self.root.is_absorbing:
             for k in self.step_statistics:
                 self.step_statistics[k] = np.nan
@@ -106,6 +107,9 @@ class MCTS:
         self._last_action = self.get_action()
         self._step_num += 1
 
+        self.step_statistics["mem_usage"] = (
+            psutil.Process().memory_info().rss / 1024**2
+        )
         self.stat_tracker.step()
 
         return self._last_action
@@ -141,6 +145,7 @@ class MCTS:
             "inference_time": 0.0,
             "search_depth": 0,
             "num_sims": 0,
+            "mem_usage": 0,
             "min_value": self._min_max_stats.minimum,
             "max_value": self._min_max_stats.maximum,
         }
@@ -305,9 +310,7 @@ class MCTS:
         depth: int,
         search_policy: Policy,
     ) -> Tuple[float, int]:
-        if depth > self.config.depth_limit or (
-            self.step_limit is not None and obs_node.t + depth > self.step_limit
-        ):
+        if depth > self.config.depth_limit or obs_node.t > self.step_limit:
             return 0, depth
 
         if len(obs_node.children) == 0:
@@ -404,48 +407,47 @@ class MCTS:
         rollout_policy: Policy,
         rollout_policy_state: PolicyState,
     ) -> float:
-        if depth > self.config.depth_limit or (
-            self.step_limit is not None and hps.t > self.step_limit
-        ):
-            return 0
+        agent_return = 0
+        rollout_t = 0
+        while depth <= self.config.depth_limit and hps.t <= self.step_limit:
+            ego_action = rollout_policy.sample_action(rollout_policy_state)
+            joint_action = self._get_joint_action(hps, ego_action)
 
-        ego_action = rollout_policy.sample_action(rollout_policy_state)
-        joint_action = self._get_joint_action(hps, ego_action)
-
-        joint_step = self.model.step(hps.state, joint_action)
-        joint_obs = joint_step.observations
-        reward = joint_step.rewards[self.agent_id]
-
-        if (
-            joint_step.terminations[self.agent_id]
-            or joint_step.truncations[self.agent_id]
-            or joint_step.all_done
-        ):
-            return reward
-
-        if self.config.state_belief_only:
-            new_history = None
-            next_pi_state = None
-        else:
-            new_history = hps.history.extend(joint_action, joint_obs)
-            next_pi_state = self._update_other_agent_policies(
-                joint_action, joint_obs, hps.policy_state
+            joint_step = self.model.step(hps.state, joint_action)
+            joint_obs = joint_step.observations
+            agent_return += (
+                self.config.discount**rollout_t * joint_step.rewards[self.agent_id]
             )
-        next_hps = B.HistoryPolicyState(
-            joint_step.state, new_history, next_pi_state, hps.t + 1
-        )
 
-        next_rollout_policy_state = self._update_policy_state(
-            joint_action[self.agent_id],
-            joint_obs[self.agent_id],
-            rollout_policy,
-            rollout_policy_state,
-        )
+            if (
+                joint_step.terminations[self.agent_id]
+                or joint_step.truncations[self.agent_id]
+                or joint_step.all_done
+            ):
+                break
 
-        future_return = self._rollout(
-            next_hps, depth + 1, rollout_policy, next_rollout_policy_state
-        )
-        return reward + self.config.discount * future_return
+            if self.config.state_belief_only:
+                new_history = None
+                next_pi_state = None
+            else:
+                new_history = hps.history.extend(joint_action, joint_obs)
+                next_pi_state = self._update_other_agent_policies(
+                    joint_action, joint_obs, hps.policy_state
+                )
+            hps = B.HistoryPolicyState(
+                joint_step.state, new_history, next_pi_state, hps.t + 1
+            )
+            rollout_policy_state = self._update_policy_state(
+                joint_action[self.agent_id],
+                joint_obs[self.agent_id],
+                rollout_policy,
+                rollout_policy_state,
+            )
+
+            depth += 1
+            rollout_t += 1
+
+        return agent_return
 
     def _update_policy_state(
         self,
@@ -500,14 +502,14 @@ class MCTS:
         prior, noise = {}, 1 / len(self.action_space)
         for a in self.action_space:
             prior[a] = (
-                obs_node.action_probs[a] * (1 - self.config.root_exploration_fraction)
-                + noise
+                obs_node.action_probs[a] * (1 - self.config.pucb_exploration_fraction)
+                + self.config.pucb_exploration_fraction * noise
             )
 
         sqrt_n = math.sqrt(obs_node.visits)
         max_v = -float("inf")
-        max_action = obs_node.children[0].action
-        for action_node in obs_node.children:
+        max_action = 0
+        for action_node in obs_node.get_child_nodes():
             explore_v = (
                 self.config.c
                 * prior[action_node.action]
@@ -531,8 +533,8 @@ class MCTS:
         log_n = math.log(obs_node.visits)
 
         max_v = -float("inf")
-        max_action = obs_node.children[0].action
-        for action_node in obs_node.children:
+        max_action = 0
+        for action_node in obs_node.get_child_nodes():
             if action_node.visits == 0:
                 return action_node.action
             explore_v = self.config.c * math.sqrt(log_n / action_node.visits)
@@ -552,8 +554,8 @@ class MCTS:
             return random.choice(self.action_space)
 
         min_n = obs_node.visits + 1
-        next_action = obs_node.children[0].action
-        for action_node in obs_node.children:
+        next_action = 0
+        for action_node in obs_node.get_child_nodes():
             if action_node.visits < min_n:
                 min_n = action_node.visits
                 next_action = action_node.action
@@ -569,12 +571,12 @@ class MCTS:
 
         max_actions = []
         max_visits = 0
-        for a_node in obs_node.children:
-            if a_node.visits == max_visits:
-                max_actions.append(a_node.action)
-            elif a_node.visits > max_visits:
-                max_visits = a_node.visits
-                max_actions = [a_node.action]
+        for action_node in obs_node.get_child_nodes():
+            if action_node.visits == max_visits:
+                max_actions.append(action_node.action)
+            elif action_node.visits > max_visits:
+                max_visits = action_node.visits
+                max_actions = [action_node.action]
         return random.choice(max_actions)
 
     def max_value_action_selection(self, obs_node: ObsNode) -> M.ActType:
@@ -588,12 +590,12 @@ class MCTS:
 
         max_actions = []
         max_value = -float("inf")
-        for a_node in obs_node.children:
-            if a_node.value == max_value:
-                max_actions.append(a_node.action)
-            elif a_node.value > max_value:
-                max_value = a_node.value
-                max_actions = [a_node.action]
+        for action_node in obs_node.get_child_nodes():
+            if action_node.value == max_value:
+                max_actions.append(action_node.action)
+            elif action_node.value > max_value:
+                max_value = action_node.value
+                max_actions = [action_node.action]
         return random.choice(max_actions)
 
     def _get_joint_action(
@@ -610,34 +612,6 @@ class MCTS:
                 a_i = self.other_agent_policies[i].sample_action(hps.policy_state[i])
             agent_actions[i] = a_i
         return agent_actions
-
-    def get_pi(self) -> Dict[M.ActType, float]:
-        """Get agent's distribution over actions at root of tree.
-
-        Returns the softmax distribution over actions with temperature=1.0.
-        This is used as it incorporates uncertainty based on visit counts for
-        a given history.
-        """
-        if self.root.n == 0 or len(self.root.children) == 0:
-            # uniform policy
-            num_actions = len(self.action_space)
-            pi = {a: 1.0 / num_actions for a in self.action_space}
-            return pi
-
-        obs_n_sqrt = math.sqrt(self.root.n)
-        temp = 1.0
-        pi = {
-            a_node.h: math.exp(a_node.n**temp / obs_n_sqrt)
-            for a_node in self.root.children
-        }
-
-        a_probs_sum = sum(pi.values())
-        for a in self.action_space:
-            if a not in pi:
-                pi[a] = 0.0
-            pi[a] /= a_probs_sum
-
-        return pi
 
     #######################################################
     # GENERAL METHODS
@@ -666,8 +640,7 @@ class MCTS:
             init_value=0.0,
             init_visits=init_visits,
         )
-        parent.children.append(obs_node)
-
+        parent.add_child_node(obs_node)
         return obs_node
 
     #######################################################

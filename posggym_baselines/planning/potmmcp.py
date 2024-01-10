@@ -54,7 +54,7 @@ class POTMMCP(MCTS):
             init_value=0.0,
             init_visits=0,
         )
-        action_node.children.append(obs_node)
+        action_node.add_child_node(obs_node)
 
         try:
             # check if model has implemented get_agent_initial_belief
@@ -137,7 +137,7 @@ class POTMMCP(MCTS):
                 init_value=0.0,
                 init_visits=0,
             )
-            action_node.children.append(obs_node)
+            action_node.add_child_node(obs_node)
 
             obs_node.is_absorbing = self.root.is_absorbing
 
@@ -210,9 +210,7 @@ class POTMMCP(MCTS):
         depth: int,
         search_policy: Policy,
     ) -> Tuple[float, int]:
-        if depth > self.config.depth_limit or (
-            self.step_limit is not None and obs_node.t + depth > self.step_limit
-        ):
+        if depth > self.config.depth_limit or obs_node.t > self.step_limit:
             return 0, depth
 
         if len(obs_node.children) == 0:
@@ -287,7 +285,7 @@ class POTMMCP(MCTS):
                 init_value=0.0,
                 init_visits=1,
             )
-            action_node.children.append(obs_node)
+            action_node.add_child_node(child_obs_node)
         child_obs_node.is_absorbing = ego_done
         child_obs_node.belief.add_particle(next_hps)
 

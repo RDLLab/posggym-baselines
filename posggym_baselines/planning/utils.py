@@ -49,12 +49,17 @@ class PlanningStatTracker:
         "inference_time",
         "search_depth",
         "num_sims",
+        "mem_usage",
         "min_value",
         "max_value",
     ]
 
-    def __init__(self, planner):
+    # The list of keys to track max values for, otherwise we track mean values
+    MAX_STATS = {"mem_usage"}
+
+    def __init__(self, planner, track_overall: bool = True):
         self.planner = planner
+        self.track_overall = track_overall
 
         self._current_steps = 0
         self._current_stats: Dict[str, List[float]] = {k: [] for k in self.STAT_KEYS}
@@ -67,10 +72,8 @@ class PlanningStatTracker:
 
     def step(self):
         self._current_steps += 1
-        for time_key in self.STAT_KEYS:
-            self._current_stats[time_key].append(
-                self.planner.step_statistics.get(time_key, np.nan)
-            )
+        for k in self.STAT_KEYS:
+            self._current_stats[k].append(self.planner.step_statistics.get(k, np.nan))
 
     def reset(self):
         """Reset tracker."""
@@ -90,10 +93,13 @@ class PlanningStatTracker:
             return
 
         self._num_episodes += 1
-        self._all_steps.append(self._current_steps)
-        for k in self.STAT_KEYS:
-            key_step_times = self._current_stats[k]
-            self._all_stats[k].append(np.nanmean(key_step_times))
+        if self.track_overall:
+            self._all_steps.append(self._current_steps)
+            for k in self.STAT_KEYS:
+                if k in self.MAX_STATS:
+                    self._all_stats[k].append(np.nanmax(self._current_stats[k]))
+                else:
+                    self._all_stats[k].append(np.nanmean(self._current_stats[k]))
 
         self._current_steps = 0
         self._current_stats = {k: [] for k in self.STAT_KEYS}
@@ -103,10 +109,12 @@ class PlanningStatTracker:
         stats = {}
         for key, step_times in self._current_stats.items():
             if len(step_times) == 0 or np.isnan(np.sum(step_times)):
-                mean_val = np.nan
+                val = np.nan
+            elif key in self.MAX_STATS:
+                val = np.nanmax(step_times, axis=0)
             else:
-                mean_val = np.nanmean(step_times, axis=0)
-            stats[key] = mean_val
+                val = np.nanmean(step_times, axis=0)
+            stats[key] = val
         return stats
 
     def get(self) -> Dict[str, float]:
@@ -116,6 +124,10 @@ class PlanningStatTracker:
             if len(values) == 0 or np.isnan(np.sum(values)):
                 mean_val = np.nan
                 std_val = np.nan
+            elif key in self.MAX_STATS:
+                # get max and std values across episodes
+                mean_val = np.nanmax(values, axis=0)
+                std_val = np.nanstd(values, axis=0)
             else:
                 mean_val = np.nanmean(values, axis=0)
                 std_val = np.nanstd(values, axis=0)

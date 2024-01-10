@@ -7,6 +7,7 @@ from typing import Dict, Optional, Tuple, Union
 import gymnasium as gym
 import numpy as np
 import posggym.model as M
+import psutil
 from posggym.agents.policy import Policy, PolicyState
 from posggym.utils.history import AgentHistory, JointHistory
 
@@ -70,7 +71,7 @@ class INTMCP:
         elif model.spec is not None:
             self.step_limit = model.spec.max_episode_steps
         else:
-            self.step_limit = None
+            self.step_limit = float("inf")
 
         self._reinvigorator = B.BeliefRejectionSampler(
             model, config.state_belief_only, sample_limit=4 * self.config.num_particles
@@ -125,6 +126,9 @@ class INTMCP:
         self._step_num += 1
 
         self.step_statistics.update(self._collect_nested_statistics())
+        self.step_statistics["mem_usage"] = (
+            psutil.Process().memory_info().rss / 1024**2
+        )
         self.stat_tracker.step()
 
         return self._last_action
@@ -154,6 +158,7 @@ class INTMCP:
         self.stat_tracker.reset_episode()
         self._step_num = 0
         self._min_max_stats = MinMaxStats(self.config.known_bounds)
+        self._reset_step_statistics()
 
         self.root = ObsNode(
             parent=None,
@@ -169,8 +174,6 @@ class INTMCP:
         for pi in self.other_agent_policies.values():
             pi.reset()
 
-        self._reset_step_statistics()
-
     def _reset_step_statistics(self):
         self.step_statistics = {
             "search_time": 0.0,
@@ -181,6 +184,7 @@ class INTMCP:
             "inference_time": 0.0,
             "search_depth": 0,
             "num_sims": 0,
+            "mem_usage": 0,
             "min_value": self._min_max_stats.minimum,
             "max_value": self._min_max_stats.maximum,
         }
@@ -245,7 +249,6 @@ class INTMCP:
 
                 # store search policy state for each other agent
                 # this is used during rollouts and belief reinvigoration
-                # TODO remove this if using truncated search?
                 policy_state = {
                     j: self.search_policies[j].get_initial_state()
                     for j in self.model.possible_agents
@@ -272,9 +275,9 @@ class INTMCP:
 
     def _nested_update(self, history_dist: Dict[AgentHistory, float], current_t: int):
         self._log_debug("Pruning unused nodes from tree")
-        # traverse all nodes in tree up to current step
-        for action_node in self.root.children:
-            for obs_node in action_node.children:
+        # traverse all nodes in tree upto current step
+        for action_node in self.root.get_child_nodes():
+            for obs_node in action_node.get_child_nodes():
                 h = AgentHistory(((action_node.action, obs_node.obs),))
                 self._prune_traverse(obs_node, h, history_dist, current_t)
 
@@ -312,8 +315,8 @@ class INTMCP:
                 del obs_node
             return
 
-        for action_node in obs_node.children:
-            for child_obs_node in action_node.children:
+        for action_node in obs_node.get_child_nodes():
+            for child_obs_node in action_node.get_child_nodes():
                 history_tp1 = node_history.extend(
                     action_node.action, child_obs_node.obs
                 )
@@ -546,49 +549,46 @@ class INTMCP:
         rollout_policies: Dict[str, Policy],
         rollout_policies_states: Dict[str, PolicyState],
     ) -> float:
-        if depth > self.config.depth_limit or (
-            self.step_limit is not None and hps.t > self.step_limit
-        ):
-            return 0
+        agent_return = 0
+        rollout_t = 0
+        while depth <= self.config.depth_limit and (hps.t <= self.step_limit):
+            joint_action = {
+                i: rollout_policies[i].sample_action(rollout_policies_states[i])
+                for i in self.model.possible_agents
+            }
 
-        joint_action = {
-            i: rollout_policies[i].sample_action(rollout_policies_states[i])
-            for i in self.model.possible_agents
-        }
+            joint_step = self.model.step(hps.state, joint_action)
+            joint_obs = joint_step.observations
+            reward = joint_step.rewards[self.agent_id]
+            agent_return += self.config.discount**rollout_t * reward
 
-        joint_step = self.model.step(hps.state, joint_action)
-        joint_obs = joint_step.observations
-        reward = joint_step.rewards[self.agent_id]
+            if (
+                joint_step.terminations[self.agent_id]
+                or joint_step.truncations[self.agent_id]
+                or joint_step.all_done
+            ):
+                break
 
-        if (
-            joint_step.terminations[self.agent_id]
-            or joint_step.truncations[self.agent_id]
-            or joint_step.all_done
-        ):
-            return reward
-
-        next_pi_state = self._update_other_agent_search_policies(
-            joint_action, joint_obs, hps.policy_state
-        )
-        # history is None as it is not used during rollouts
-        next_hps = B.HistoryPolicyState(
-            joint_step.state, None, next_pi_state, hps.t + 1
-        )
-
-        next_rollout_policies_states = {
-            i: self._update_policy_state(
-                joint_action[i],
-                joint_obs[i],
-                rollout_policies[i],
-                rollout_policies_states[i],
+            next_pi_state = self._update_other_agent_search_policies(
+                joint_action, joint_obs, hps.policy_state
             )
-            for i in self.model.possible_agents
-        }
+            # history is None as it is not used during rollouts
+            hps = B.HistoryPolicyState(joint_step.state, None, next_pi_state, hps.t + 1)
 
-        future_return = self._rollout(
-            next_hps, depth + 1, rollout_policies, next_rollout_policies_states
-        )
-        return reward + self.config.discount * future_return
+            rollout_policies_states = {
+                i: self._update_policy_state(
+                    joint_action[i],
+                    joint_obs[i],
+                    rollout_policies[i],
+                    rollout_policies_states[i],
+                )
+                for i in self.model.possible_agents
+            }
+
+            depth += 1
+            rollout_t += 1
+
+        return agent_return
 
     def _update_policy_state(
         self,
@@ -643,14 +643,14 @@ class INTMCP:
         prior, noise = {}, 1 / len(self.action_spaces[self.agent_id])
         for a in self.action_space[self.agent_id]:
             prior[a] = (
-                obs_node.action_probs[a] * (1 - self.config.root_exploration_fraction)
-                + noise
+                obs_node.action_probs[a] * (1 - self.config.pucb_exploration_fraction)
+                + self.config.pucb_exploration_fraction * noise
             )
 
         sqrt_n = math.sqrt(obs_node.visits)
         max_v = -float("inf")
-        max_action = obs_node.children[0].action
-        for action_node in obs_node.children:
+        max_action = 0
+        for action_node in obs_node.get_child_nodes():
             explore_v = (
                 self.config.c
                 * prior[action_node.action]
@@ -674,8 +674,8 @@ class INTMCP:
         log_n = math.log(obs_node.visits)
 
         max_v = -float("inf")
-        max_action = obs_node.children[0].action
-        for action_node in obs_node.children:
+        max_action = 0
+        for action_node in obs_node.get_child_nodes():
             if action_node.visits == 0:
                 return action_node.action
             explore_v = self.config.c * math.sqrt(log_n / action_node.visits)
@@ -695,8 +695,8 @@ class INTMCP:
             return random.choice(self.action_spaces[self.agent_id])
 
         min_n = obs_node.visits + 1
-        next_action = obs_node.children[0].action
-        for action_node in obs_node.children:
+        next_action = 0
+        for action_node in obs_node.get_child_nodes():
             if action_node.visits < min_n:
                 min_n = action_node.visits
                 next_action = action_node.action
@@ -712,12 +712,12 @@ class INTMCP:
 
         max_actions = []
         max_visits = 0
-        for a_node in obs_node.children:
-            if a_node.visits == max_visits:
-                max_actions.append(a_node.action)
-            elif a_node.visits > max_visits:
-                max_visits = a_node.visits
-                max_actions = [a_node.action]
+        for action_node in obs_node.get_child_nodes():
+            if action_node.visits == max_visits:
+                max_actions.append(action_node.action)
+            elif action_node.visits > max_visits:
+                max_visits = action_node.visits
+                max_actions = [action_node.action]
         return random.choice(max_actions)
 
     def max_value_action_selection(self, obs_node: ObsNode) -> M.ActType:
@@ -731,12 +731,12 @@ class INTMCP:
 
         max_actions = []
         max_value = -float("inf")
-        for a_node in obs_node.children:
-            if a_node.value == max_value:
-                max_actions.append(a_node.action)
-            elif a_node.value > max_value:
-                max_value = a_node.value
-                max_actions = [a_node.action]
+        for action_node in obs_node.get_child_nodes():
+            if action_node.value == max_value:
+                max_actions.append(action_node.action)
+            elif action_node.value > max_value:
+                max_value = action_node.value
+                max_actions = [action_node.action]
         return random.choice(max_actions)
 
     def _get_joint_action(
@@ -778,11 +778,14 @@ class INTMCP:
             return search_policy.sample_action(search_policy_state)
 
         obs_n_sqrt = math.sqrt(obs_node.visits)
-        a_probs = [math.exp(a_node.visits / obs_n_sqrt) for a_node in obs_node.children]
+        a_probs = [
+            math.exp(action_node.visits / obs_n_sqrt)
+            for action_node in obs_node.get_child_nodes()
+        ]
         a_probs_sum = sum(a_probs)
         a_probs = [p / a_probs_sum for p in a_probs]
 
-        action_node = random.choices(obs_node.children, weights=a_probs)[0]
+        action_node = random.choices(obs_node.get_child_nodes(), weights=a_probs)[0]
         return action_node.action
 
     #######################################################
@@ -827,7 +830,7 @@ class INTMCP:
             init_value=0.0,
             init_visits=init_visits,
         )
-        parent.children.append(obs_node)
+        parent.add_child_node(obs_node)
 
         return obs_node
 

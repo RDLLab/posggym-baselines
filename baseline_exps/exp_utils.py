@@ -1,21 +1,21 @@
 import csv
 import math
+import os
 import pprint
 import time
-import os
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional
 from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional
 
 import posggym
 import psutil
 import yaml
 from posggym.agents.wrappers import AgentEnvWrapper
-
 from posggym_baselines.planning.config import MCTSConfig
 from posggym_baselines.planning.utils import PlanningStatTracker
 from posggym_baselines.utils.agent_env_wrapper import UniformOtherAgentFn
+
 
 BASELINE_EXP_DIR = Path(__file__).resolve().parent
 ENV_DATA_DIR = BASELINE_EXP_DIR / "env_data"
@@ -23,7 +23,7 @@ RESULTS_DIR = BASELINE_EXP_DIR / "results"
 
 RESULTS_DIR.mkdir(exist_ok=True)
 
-# Default parameters
+# Defaul parameters
 DEFAULT_SEARCH_TIMES = [0.1, 1.0, 5.0, 10.0, 20.0]
 DEFAULT_NUM_EPISODES = 500
 DEFAULT_EXP_TIME_LIMIT = 60 * 60 * 48  # 48 hours
@@ -34,7 +34,7 @@ DEFAULT_PLANNING_CONFIG_KWARGS_PUCB = {
     "c": 1.25,
     "truncated": True,
     "action_selection": "pucb",
-    "root_exploration_fraction": 0.5,
+    "pucb_exploration_fraction": 0.5,
     "known_bounds": None,
     "extra_particles_prop": 1.0 / 16,
     "step_limit": None,  # Set in algorithm, if env has a step limit
@@ -343,8 +343,10 @@ class PlanningExpParams:
     ):
         if report_mem_usage:
             process = psutil.Process(os.getpid())
-            mem_usage = process.memory_info().rss / 1024**2
-            log = f"(MEM={mem_usage:.0f}MB) {log}"
+            rss = process.memory_info().rss / 1024**2
+            vrt = process.memory_info().vms / 1024**2
+            shr = process.memory_info().shared / 1024**2
+            log = f"(MEM={vrt:.0f}/{rss:.0f}/{shr:.0f}MB VIRT/RSS/SHR) {log}"
 
         if add_timestamp:
             time_taken = time.time() - self.exp_start_time
@@ -371,6 +373,8 @@ def run_planning_exp(exp_params: PlanningExpParams):
     env = AgentEnvWrapper(env, other_agent_fn)
 
     planner = exp_params.planner_init_fn(env.model, exp_params)
+    # disable tracking overall stats since we only log per episode
+    planner.stat_tracker.track_overall = False
 
     # run episode loop
     exp_start_time = time.time()

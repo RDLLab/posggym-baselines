@@ -53,21 +53,22 @@ class ObsNode(Node):
         self.value = init_value
         self.visits = init_visits
         self.is_absorbing = is_absorbing
-        self.children: List["ActionNode"] = []
+        self.children: Dict[M.ActType, "ActionNode"] = {}
 
     def get_child(self, action: M.ActType) -> "ActionNode":
         """Get child node for given action value."""
-        for action_node in self.children:
-            if action_node.action == action:
-                return action_node
+        child_node = self.children.get(action, None)
+        if child_node is not None:
+            return child_node
         raise AssertionError(f"ObsNode {str(self)} has no child node for {action=}")
 
     def has_child(self, action: M.ActType) -> bool:
         """Check if this obs node has a child node matching action."""
-        return any(action_node.action == action for action_node in self.children)
+        return action in self.children
 
     def add_child(self, action: M.ActType) -> "ActionNode":
         """Add a child node for given action."""
+        assert action not in self.children
         action_node = ActionNode(
             parent=self,
             action=action,
@@ -77,8 +78,12 @@ class ObsNode(Node):
             init_visits=0,
             init_total_value=0.0,
         )
-        self.children.append(action_node)
+        self.children[action] = action_node
         return action_node
+
+    def get_child_nodes(self) -> List["ActionNode"]:
+        """Get all child nodes."""
+        return list(self.children.values())
 
     def policy_str(self) -> str:
         """Get policy in nice str format."""
@@ -136,18 +141,27 @@ class ActionNode(Node):
         # for calculating rolling variance
         self.agg = 0
         self.var = 0
-        self.children: List[ObsNode] = []
+        self.children: Dict[M.ObsType, ObsNode] = {}
 
     def get_child(self, obs: M.ObsType) -> ObsNode:
         """Get child obs node matching given observation."""
-        for obs_node in self.children:
-            if obs_node.obs == obs:
-                return obs_node
+        child_node = self.children.get(obs, None)
+        if child_node is not None:
+            return child_node
         raise AssertionError(f"ActionNode {str(self)} has no child node for {obs=}")
 
     def has_child(self, obs: M.ObsType) -> bool:
         """Check if node has a child node matching history."""
-        return any(obs_node.obs == obs for obs_node in self.children)
+        return obs in self.children
+
+    def add_child_node(self, obs_node: ObsNode) -> None:
+        """Add a child node."""
+        assert obs_node.obs not in self.children
+        self.children[obs_node.obs] = obs_node
+
+    def get_child_nodes(self) -> List[ObsNode]:
+        """Get all child nodes."""
+        return list(self.children.values())
 
     def update(self, new_value: float):
         """Update action node statistics.
