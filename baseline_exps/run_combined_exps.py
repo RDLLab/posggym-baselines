@@ -179,6 +179,9 @@ def main(args):
 
     print(f"Total number of experiments={len(all_exp_params)}")
 
+    # sort experiments by search time, longest first (can help with scheduling)
+    all_exp_params.sort(key=lambda x: x.config.search_time_limit, reverse=True)
+
     start_time = time.time()
     # run experiments
     if args.n_cpus == 1:

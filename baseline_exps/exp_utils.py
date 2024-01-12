@@ -464,7 +464,9 @@ class CombinedExpParams(PlanningExpParams):
 def run_planning_exp(exp_params: PlanningExpParams):
     print(
         f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] "
-        f"Running experiment {exp_params.exp_name} {exp_params.exp_num}"
+        f"Running experiment {exp_params.exp_name} {exp_params.exp_num}: "
+        f"{exp_params.planning_pop_id} vs {exp_params.test_pop_id} with "
+        f"search_time={exp_params.config.search_time_limit}."
     )
     exp_params.setup_exp()
 
