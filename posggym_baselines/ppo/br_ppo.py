@@ -9,15 +9,15 @@ distribution is part of the environment.
 
 """
 from dataclasses import dataclass
-from typing import Optional, Dict, List, Callable
+from typing import Callable, Dict, List, Optional
 
+import numpy as np
 import posggym
 import posggym.agents as pga
-import numpy as np
 import torch
 
 from posggym_baselines.ppo.config import PPOConfig
-from posggym_baselines.ppo.network import PPOModel, PPOLSTMModel
+from posggym_baselines.ppo.network import PPOLSTMModel, PPOModel
 
 
 class UniformOtherAgentFn:

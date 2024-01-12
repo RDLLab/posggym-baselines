@@ -18,6 +18,7 @@ Script has two modes:
 
 """
 import argparse
+import warnings
 from pathlib import Path
 from typing import Dict
 
@@ -110,6 +111,7 @@ def combine_all_experiment_results(
     save_to_file: bool = True,
     summarize: bool = True,
     save_to_main_results_dir: bool = False,
+    combined: bool = False,
 ) -> Dict[str, pd.DataFrame]:
     """Combine results from all experiments (alg, env) in `parent_dir`.
 
@@ -128,6 +130,11 @@ def combine_all_experiment_results(
         Whether to summarize results over all episodes. If True, will compute mean,
         std, and 95% confidence interval over all episodes for each (alg, env)
         sub-experiment Otherwise results will contain results for each episode.
+    save_to_main_results_dir
+        Whether to save results to main `env_data` dir. Will overwrite existing
+        results so be careful.
+    combined
+        Whether results are for combined RL+Planning experiments.
 
     Returns
     -------
@@ -152,6 +159,17 @@ def combine_all_experiment_results(
         if env_id not in all_env_exp_results:
             all_env_exp_results[env_id] = []
 
+        if alg == "COMBINED" and not combined:
+            warnings.warn(
+                "Found COMBINED results but `combined` flag is False. Skipping..."
+            )
+            continue
+        if alg != "COMBINED" and combined:
+            warnings.warn(
+                "Found non-COMBINED results but `combined` flag is True. Skipping..."
+            )
+            continue
+
         env_alg_results = compile_sub_experiment_results(
             exp_parent_dir, save_to_file=False, summarize=summarize
         )
@@ -160,27 +178,25 @@ def combine_all_experiment_results(
         env_alg_results.insert(0, "alg", alg)
         all_env_exp_results[env_id].append(env_alg_results)
 
-    combined_results = {
+    all_env_results = {
         env_id: pd.concat(all_env_exp_results[env_id], ignore_index=True)
         for env_id in all_env_exp_results
     }
 
     # save combined results
     if save_to_file:
-        if summarize:
-            save_file_suffix = "planning_summary_results.csv"
-        else:
-            save_file_suffix = "planning_results.csv"
+        suffix = "_summary_results.csv" if summarize else "_results.csv"
+        suffix = "combined" + suffix if combined else "planning" + suffix
 
-        for env_id in combined_results:
+        for env_id in all_env_results:
             if save_to_main_results_dir:
-                env_save_file = ENV_DATA_DIR / env_id / save_file_suffix
+                env_save_file = ENV_DATA_DIR / env_id / suffix
             else:
-                env_save_file = parent_dir / f"{env_id}_{save_file_suffix}"
+                env_save_file = parent_dir / f"{env_id}_{suffix}"
             print(f"Saving results to {env_save_file}")
-            combined_results[env_id].to_csv(env_save_file, index=False)
+            all_env_results[env_id].to_csv(env_save_file, index=False)
 
-    return combined_results
+    return all_env_results
 
 
 if __name__ == "__main__":
@@ -213,6 +229,11 @@ if __name__ == "__main__":
             "results so be careful."
         ),
     )
+    parser.add_argument(
+        "--combined",
+        action="store_true",
+        help="Whether results are for combined RL+Planning experiments.",
+    )
     args = parser.parse_args()
 
     for parent_dir in args.exp_results_parent_dirs:
@@ -223,4 +244,5 @@ if __name__ == "__main__":
                 parent_dir,
                 summarize=args.summarize,
                 save_to_main_results_dir=args.save_to_main_results_dir,
+                combined=args.combined,
             )

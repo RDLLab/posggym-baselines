@@ -52,6 +52,58 @@ DEFAULT_PLANNING_CONFIG_KWARGS_UCB["truncated"] = False
 DEFAULT_PLANNING_CONFIG_KWARGS_UCB["c"] = math.sqrt(2)
 
 
+DEFAULT_RL_CONFIG = {
+    "eval_fns": [],
+    # general config
+    "exp_name": "br_ppo",
+    "seed": 0,
+    "cuda": True,
+    "torch_deterministic": False,
+    "worker_device": "cpu",
+    "disable_logging": False,
+    "track_wandb": True,
+    "wandb_project": "posggym_baselines",
+    "wandb_entity": None,
+    "wandb_group": None,
+    "load_dir": None,
+    "save_interval": -1,
+    # env config
+    "capture_video": False,
+    # eval configuration
+    "eval_interval": 100,
+    "eval_episodes": 100,
+    "num_eval_envs": 32,
+    # training config
+    "total_timesteps": int(1e8),
+    "num_workers": 2,
+    "num_envs": 32,
+    "num_rollout_steps": 64,
+    # batch size = 32 * 64 * 2 = 4096
+    "seq_len": 10,
+    "minibatch_size": 2048,
+    # minibatch_num_seqs roughly = 2048 // 10 = 205
+    "update_epochs": 2,
+    # PPO update hyperparams
+    "learning_rate": 3e-4,
+    "anneal_lr": False,
+    "gamma": 0.99,
+    "gae_lambda": 0.95,
+    "norm_adv": True,
+    "clip_coef": 0.2,
+    "clip_vloss": True,
+    "vf_coef": 0.5,
+    "ent_coef": 0.01,
+    "max_grad_norm": 10,
+    "target_kl": None,
+    # model config
+    "use_lstm": True,
+    "lstm_size": 64,
+    "lstm_num_layers": 1,
+    "trunk_sizes": [64, 64],
+    "head_sizes": [64],
+}
+
+
 PURSUITEVASION_POLICY_NAMES = {
     0: {
         "P0": [f"KLR{i}_i0" for i in list(range(5)) + ["BR"]],
@@ -77,9 +129,11 @@ class EnvData:
     """Data for a particular environment."""
 
     # Environment data
+    full_env_id: str
     env_id: str
     agent_id: str
     other_agent_id: str
+
     # env_kwargs contains `env_id` and `env_kwargs` keys
     env_kwargs: Dict[str, Dict[str, Any]]
     env_data_dir: Path
@@ -108,16 +162,26 @@ class EnvData:
     # Experiment results
     planning_results_file: Path
     planning_summary_results_file: Path
+    combined_results_file: Path
 
 
-def get_env_data(env_id: str, agent_id: Optional[str]):
+# TODO remove env_id and agent_id and use full_env_id only
+#      (do this after all experiments are done)
+def get_env_data(
+    env_id: Optional[str], agent_id: Optional[str], full_env_id: Optional[str] = None
+):
     """Get the env data for the given env name."""
-    if agent_id is None:
-        env_data_path = ENV_DATA_DIR / env_id
-        full_env_id = env_id
+    if full_env_id is None:
+        assert env_id is not None
+        full_env_id = env_id if agent_id is None else f"{env_id}_i{agent_id}"
     else:
-        env_data_path = ENV_DATA_DIR / f"{env_id}_i{agent_id}"
-        full_env_id = f"{env_id}_i{agent_id}"
+        if len(full_env_id.split("_")) == 2:
+            env_id, agent_id = full_env_id.split("_")
+            agent_id = agent_id.replace("i", "")
+        else:
+            env_id = full_env_id
+            agent_id = None
+    env_data_path = ENV_DATA_DIR / full_env_id
 
     env_kwargs_file = env_data_path / "env_kwargs.yaml"
     with open(env_kwargs_file, "r") as f:
@@ -188,6 +252,7 @@ def get_env_data(env_id: str, agent_id: Optional[str]):
         meta_policy = yaml.safe_load(f)
 
     return EnvData(
+        full_env_id=full_env_id,
         env_id=env_id,
         agent_id=ego_agent_id,
         other_agent_id=other_agent_id,
@@ -204,6 +269,7 @@ def get_env_data(env_id: str, agent_id: Optional[str]):
         meta_policy=meta_policy,
         planning_results_file=env_data_path / "planning_results.csv",
         planning_summary_results_file=env_data_path / "planning_summary_results.csv",
+        combined_results_file=env_data_path / "combined_results.csv",
     )
 
 
@@ -214,21 +280,13 @@ def load_all_env_data() -> Dict[str, EnvData]:
     for full_env_id in full_env_ids:
         if not (ENV_DATA_DIR / full_env_id).is_dir():
             continue
-        tokens = full_env_id.split("_")
-        if len(tokens) == 1:
-            env_id = tokens[0]
-            agent_id = None
-        else:
-            assert len(tokens) == 2
-            env_id = tokens[0]
-            agent_id = tokens[1].replace("i", "")
-        all_env_data[full_env_id] = get_env_data(env_id, agent_id)
+        all_env_data[full_env_id] = get_env_data(None, None, full_env_id=full_env_id)
     return all_env_data
 
 
 @dataclass
 class PlanningExpParams:
-    """Parameters for running POTMMCP experiments."""
+    """Parameters for running planning experiments."""
 
     # stuff used for running experiments
     env_kwargs: Dict
@@ -250,6 +308,7 @@ class PlanningExpParams:
     exp_results_parent_dir: Path
     planning_pop_id: str
     test_pop_id: str
+    full_env_id: str
 
     exp_results_dir: Path = field(init=False)
     episode_results_file: str = field(init=False)
@@ -259,16 +318,8 @@ class PlanningExpParams:
     exp_start_time: float = field(init=False)
 
     def __post_init__(self):
-        search_time = self.config.search_time_limit
-        if search_time < 1.0:
-            search_time_str = f"{search_time:.1f}"
-        else:
-            search_time_str = f"{search_time:.0f}"
-
         self.exp_results_dir = (
-            self.exp_results_parent_dir
-            / f"{self.exp_num}_{self.planning_pop_id}_{self.test_pop_id}_"
-            f"{search_time_str}"
+            self.exp_results_parent_dir / self.get_exp_results_file_name()
         )
 
         self.episode_results_file = self.exp_results_dir / "episode_results.csv"
@@ -283,16 +334,13 @@ class PlanningExpParams:
             "time",
         ] + PlanningStatTracker.STAT_KEYS
 
-    def setup_exp(self):
-        """Runs necessary setup for experiment.
+    def get_exp_results_file_name(self):
+        file_name = f"{self.exp_num}_{self.planning_pop_id}_{self.test_pop_id}"
+        file_name += f"_{self.config.search_time_limit:1g}"
+        return file_name
 
-        I.e. setup results directly, files, logging, etc
-        """
-        self.exp_start_time = time.time()
-
-        self.exp_results_dir.mkdir(exist_ok=True)
-
-        exp_args = {
+    def get_exp_args(self):
+        return {
             "exp_num": self.exp_num,
             "env_id": self.env_kwargs["env_id"],
             "agent_id": self.agent_id,
@@ -302,6 +350,17 @@ class PlanningExpParams:
             "num_episodes": self.num_episodes,
             "exp_time_limit": self.exp_time_limit,
         }
+
+    def setup_exp(self):
+        """Runs necessary setup for experiment.
+
+        I.e. setup results directly, files, logging, etc
+        """
+        self.exp_start_time = time.time()
+
+        self.exp_results_dir.mkdir(exist_ok=True)
+
+        exp_args = self.get_exp_args()
         with open(self.exp_args_file, "w") as f:
             yaml.safe_dump(exp_args, f)
 
@@ -356,6 +415,50 @@ class PlanningExpParams:
 
         with open(self.exp_log_file, "a") as f:
             f.write(log + "\n")
+
+
+@dataclass
+class CombinedExpParams(PlanningExpParams):
+    """Parameters for running combined planning + RL experiments."""
+
+    # RL policy stuff
+    rl_policy_seed: int
+    rl_policy_pop_id: str
+    env_data_dir: Path
+
+    rl_policy_file: Path = field(init=False)
+
+    def __post_init__(self):
+        super().__post_init__()
+
+        policy_file_name = f"{self.rl_policy_pop_id}"
+        if self.full_env_id == "PursuitEvasion-v1_i0":
+            policy_file_name += "_i0"
+        elif self.full_env_id == "PursuitEvasion-v1_i1":
+            policy_file_name += "_i1"
+        policy_file_name += f"_seed{self.rl_policy_seed}.pt"
+
+        self.rl_policy_file = self.env_data_dir / "br_models" / policy_file_name
+
+    def get_exp_results_file_name(self):
+        file_name = f"{self.exp_num}_{self.planning_pop_id}_{self.test_pop_id}"
+        file_name += f"_rl{self.rl_policy_pop_id}_s{self.rl_policy_seed}"
+        file_name += f"_{self.config.search_time_limit:1g}"
+        return file_name
+
+    def get_exp_args(self):
+        return {
+            "exp_num": self.exp_num,
+            "env_id": self.env_kwargs["env_id"],
+            "agent_id": self.agent_id,
+            "planning_pop_id": self.planning_pop_id,
+            "test_pop_id": self.test_pop_id,
+            "rl_policy_pop_id": self.rl_policy_pop_id,
+            "rl_policy_seed": self.rl_policy_seed,
+            "search_time_limit": self.config.search_time_limit,
+            "num_episodes": self.num_episodes,
+            "exp_time_limit": self.exp_time_limit,
+        }
 
 
 def run_planning_exp(exp_params: PlanningExpParams):

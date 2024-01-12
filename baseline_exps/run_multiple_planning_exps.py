@@ -26,6 +26,18 @@ def main(args):
     # limit number of threads to 1 for each process
     torch.set_num_threads(1)
 
+    if args.alg_names == ["all"]:
+        args.alg_names = ["INTMCP", "IPOMCP", "POMCP", "POTMMCP"]
+    if "all" in args.full_env_ids:
+        args.full_env_ids = [
+            "CooperativeReaching-v0",
+            "Driving-v1",
+            "LevelBasedForaging-v3",
+            "PredatorPrey-v0",
+            "PursuitEvasion-v1_i0",
+            "PursuitEvasion-v1_i1",
+        ]
+
     all_exp_params = []
     for alg_name, full_env_id in itertools.product(args.alg_names, args.full_env_ids):
         tokens = full_env_id.split("_")
@@ -90,7 +102,7 @@ if __name__ == "__main__":
         type=str,
         nargs="+",
         required=True,
-        choices=["INTMCP", "IPOMCP", "POMCP", "POTMMCP"],
+        choices=["INTMCP", "IPOMCP", "POMCP", "POTMMCP", "all"],
         help="Planning algorithm to run.",
     )
     parser.add_argument(
@@ -105,6 +117,7 @@ if __name__ == "__main__":
             "PredatorPrey-v0",
             "PursuitEvasion-v1_i0",
             "PursuitEvasion-v1_i1",
+            "all",
         ],
         help="Name of environment.",
     )

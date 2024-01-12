@@ -1,5 +1,5 @@
 """Actor and Critic network for PPO algorithm."""
-from typing import Optional, List, Tuple
+from typing import List, Optional, Tuple
 
 import numpy as np
 import torch

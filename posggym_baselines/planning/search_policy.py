@@ -1,9 +1,16 @@
 import abc
 from typing import Dict, Optional
 
+import numpy as np
 import posggym.model as M
+import torch
 from posggym.agents.policy import Policy, PolicyState
+from posggym.agents.utils import processors
+from posggym.agents.utils.action_distributions import DiscreteActionDistribution
 from posggym.utils.history import AgentHistory
+from torch.distributions.categorical import Categorical
+
+from posggym_baselines.ppo.network import PPOLSTMModel
 
 
 class SearchPolicy(abc.ABC):
@@ -223,3 +230,59 @@ def load_posggym_agents_search_policy(
 
     policy = pga.make(policy_id, model, agent_id)
     return SearchPolicyWrapper(policy)
+
+
+class PPOLSTMSearchPolicy(SearchPolicy):
+    def __init__(
+        self,
+        model: M.POSGModel,
+        agent_id: str,
+        policy_id: str,
+        policy_model: PPOLSTMModel,
+        obs_processor: processors.Processor,
+    ):
+        super().__init__(model, agent_id, policy_id)
+        self.policy_model = policy_model
+        self.action_space = list(range(model.action_spaces[agent_id].n))
+        self.obs_processor = obs_processor
+
+    def get_initial_state(self) -> PolicyState:
+        lstm_shape = (self.policy_model.lstm_layers, 1, self.policy_model.lstm_size)
+        lstm_state = (torch.zeros(lstm_shape).cpu(), torch.zeros(lstm_shape).cpu())
+        return {"lstm_state": lstm_state, "pi": None, "value": 0.0}
+
+    def get_next_state(
+        self,
+        action: Optional[M.ActType],
+        obs: M.ObsType,
+        state: PolicyState,
+    ) -> PolicyState:
+        obs = self.obs_processor(obs)
+        if isinstance(obs, np.ndarray):
+            obs = torch.tensor(obs, dtype=torch.float32)
+
+        with torch.no_grad():
+            hidden_state, lstm_state = self.policy_model.get_states(
+                obs, state["lstm_state"], done=torch.tensor([0])
+            )
+            logits = self.policy_model.actor(hidden_state)
+            probs = Categorical(logits=logits).probs.squeeze()
+            value = self.policy_model.critic(hidden_state)
+
+        return {
+            "lstm_state": lstm_state,
+            "pi": DiscreteActionDistribution({a: probs[a] for a in self.action_space}),
+            "value": value[0].item(),
+        }
+
+    def sample_action(self, state: PolicyState) -> M.ActType:
+        return state["pi"].sample()
+
+    def get_pi(self, state: PolicyState) -> Dict[M.ActType, float]:
+        return state["pi"].probs
+
+    def get_value(self, state: PolicyState) -> float:
+        return state["value"]
+
+    def close(self):
+        return

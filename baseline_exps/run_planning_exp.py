@@ -1,14 +1,30 @@
-"""Script for running POTMMCP baseline experiments.
+"""Script for running planning baseline experiments.
 
-Specifically, for a given baseline environment and population (P0, P1) and mode
-(in-distribution, out-of-distribution), run POTMMCP for `num_episodes` episodes for
-various search budgets and save the results to a file.
+For a given planning algorithm and baseline environment runs the planning algorithm for
+`num_episodes` episodes for selected `search_times` save the results to a file.
+Runs the algorithm for both population `P0` and `P1` and tests against both
+populations, leading to 4 * |`search_times`| experiments.
 
+Available algorithms:
 
-in-distribution - planning agent is evaluated against the same population that it uses
-    for planning
-out-of-distribution - planning agent is evaluated against different population to the
-    one it uses for planning
+- INTMCP
+- IPOMCP
+- POMCP
+- POTMMCP
+
+Available environments:
+
+- CooperativeReaching-v0
+- Driving-v1
+- LevelBasedForaging-v3
+- PredatorPrey-v0
+- PursuitEvasion-v1_i0
+- PursuitEvasion-v1_i1
+
+Examples:
+
+    # run INTMCP on Driving-v1 for 100 episodes for 1s and 10s
+    python run_planning_exp.py INTMCP --env_id Driving-v1 --search_times 1 10
 
 """
 import argparse
@@ -18,13 +34,14 @@ import multiprocessing as mp
 import pprint
 import time
 from datetime import datetime
-from typing import List
 from pathlib import Path
+from typing import List
 
 import exp_utils
 import posggym
 import torch
 from exp_utils import PlanningExpParams
+
 from posggym_baselines.planning.config import MCTSConfig
 from posggym_baselines.planning.intmcp import INTMCP
 from posggym_baselines.planning.ipomcp import IPOMCP
@@ -32,7 +49,6 @@ from posggym_baselines.planning.other_policy import OtherAgentMixturePolicy
 from posggym_baselines.planning.pomcp import POMCP
 from posggym_baselines.planning.potmmcp import POTMMCP, POTMMCPMetaPolicy
 from posggym_baselines.planning.search_policy import RandomSearchPolicy
-
 
 # same as in I-POMCP paper experiments
 # also best performing value in I-NTMCP paper
@@ -83,6 +99,7 @@ def get_intmcp_exp_params(
             exp_results_parent_dir=exp_results_parent_dir,
             planning_pop_id=planning_pop_id,
             test_pop_id=test_pop_id,
+            full_env_id=env_data.full_env_id,
         )
         all_exp_params.append(exp_params)
         exp_num += 1
@@ -142,6 +159,7 @@ def get_ipomcp_exp_params(
             exp_results_parent_dir=exp_results_parent_dir,
             planning_pop_id=planning_pop_id,
             test_pop_id=test_pop_id,
+            full_env_id=env_data.full_env_id,
         )
         all_exp_params.append(exp_params)
         exp_num += 1
@@ -188,6 +206,7 @@ def get_pomcp_exp_params(
             exp_results_parent_dir=exp_results_parent_dir,
             planning_pop_id=planning_pop_id,
             test_pop_id=test_pop_id,
+            full_env_id=env_data.full_env_id,
         )
         all_exp_params.append(exp_params)
         exp_num += 1
@@ -251,6 +270,7 @@ def get_potmmcp_exp_params(
             exp_results_parent_dir=exp_results_parent_dir,
             planning_pop_id=planning_pop_id,
             test_pop_id=test_pop_id,
+            full_env_id=env_data.full_env_id,
         )
         all_exp_params.append(exp_params)
         exp_num += 1
