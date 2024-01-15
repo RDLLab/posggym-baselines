@@ -155,4 +155,10 @@ if __name__ == "__main__":
         default=2,
         help="Number of worker processes.",
     )
+    parser.add_argument(
+        "--use_lstm",
+        type=strtobool,
+        default=True,
+        help="Whether to use LSTM based policy network for learner.",
+    )
     train(parser.parse_args())

@@ -9,7 +9,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.multiprocessing as mp
+
 from posggym_baselines.ppo.network import PPOModel
+
 
 if TYPE_CHECKING:
     from posggym_baselines.ppo.config import PPOConfig

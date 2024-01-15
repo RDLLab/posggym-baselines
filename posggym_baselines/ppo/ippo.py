@@ -11,7 +11,7 @@ import numpy as np
 import torch
 
 from posggym_baselines.ppo.config import PPOConfig
-from posggym_baselines.ppo.network import PPOLSTMModel, PPOModel
+from posggym_baselines.ppo.network import PPOLSTMModel, PPOMLPModel, PPOModel
 
 
 @dataclass
@@ -33,26 +33,31 @@ class IPPOConfig(PPOConfig):
         self.num_agents = len(env.possible_agents)
 
     def load_policies(self, device: Optional[torch.device]) -> Dict[str, PPOModel]:
+        if self.use_lstm:
+            model_cls = PPOLSTMModel
+            model_kwargs = {
+                "input_size": np.prod(self.obs_space.shape),
+                "num_actions": self.act_space.n,
+                "trunk_sizes": self.trunk_sizes,
+                "lstm_size": self.lstm_size,
+                "lstm_layers": self.lstm_num_layers,
+                "head_sizes": self.head_sizes,
+            }
+        else:
+            model_cls = PPOMLPModel
+            model_kwargs = {
+                "input_size": np.prod(self.obs_space.shape),
+                "num_actions": self.act_space.n,
+                "trunk_sizes": self.trunk_sizes,
+                "head_sizes": self.head_sizes,
+            }
+
         policies = {
-            f"sp_{i}": PPOLSTMModel(
-                input_size=np.prod(self.obs_space.shape),
-                num_actions=self.act_space.n,
-                trunk_sizes=self.trunk_sizes,
-                lstm_size=self.lstm_size,
-                lstm_layers=self.lstm_num_layers,
-                head_sizes=self.head_sizes,
-            ).to(device)
+            f"sp_{i}": model_cls(**model_kwargs).to(device)
             for i in range(self.pop_size)
         }
         if self.include_BR:
-            policies["BR"] = PPOLSTMModel(
-                input_size=np.prod(self.obs_space.shape),
-                num_actions=self.act_space.n,
-                trunk_sizes=self.trunk_sizes,
-                lstm_size=self.lstm_size,
-                lstm_layers=self.lstm_num_layers,
-                head_sizes=self.head_sizes,
-            ).to(device)
+            policies["BR"] = model_cls(**model_kwargs).to(device)
         return policies
 
     def get_policy_partner_distribution(self, policy_id: str) -> Dict[str, float]:

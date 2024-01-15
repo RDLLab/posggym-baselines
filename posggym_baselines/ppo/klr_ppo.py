@@ -5,16 +5,16 @@ a population of K-Level Reasoning policies where level 0 is a best-response poli
 the uniform random policy, and each level k > 0 is a best-response policy to the level
 k-1 policy.
 """
-from dataclasses import dataclass
 import random
-from typing import Optional, Dict, List, Tuple
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
 from torch.distributions.categorical import Categorical
 
 from posggym_baselines.ppo.config import PPOConfig
-from posggym_baselines.ppo.network import PPOModel, PPOLSTMModel
+from posggym_baselines.ppo.network import PPOLSTMModel, PPOMLPModel, PPOModel
 
 
 class UniformRandomModel(PPOModel):
@@ -101,26 +101,31 @@ class KLRPPOConfig(PPOConfig):
         self.num_agents = len(env.possible_agents)
 
     def load_policies(self, device: Optional[torch.device]) -> Dict[str, PPOModel]:
+        if self.use_lstm:
+            model_cls = PPOLSTMModel
+            model_kwargs = {
+                "input_size": np.prod(self.obs_space.shape),
+                "num_actions": self.act_space.n,
+                "trunk_sizes": self.trunk_sizes,
+                "lstm_size": self.lstm_size,
+                "lstm_layers": self.lstm_num_layers,
+                "head_sizes": self.head_sizes,
+            }
+        else:
+            model_cls = PPOMLPModel
+            model_kwargs = {
+                "input_size": np.prod(self.obs_space.shape),
+                "num_actions": self.act_space.n,
+                "trunk_sizes": self.trunk_sizes,
+                "head_sizes": self.head_sizes,
+            }
+
         policies = {
-            f"k_{i}": PPOLSTMModel(
-                input_size=np.prod(self.obs_space.shape),
-                num_actions=self.act_space.n,
-                trunk_sizes=self.trunk_sizes,
-                lstm_size=self.lstm_size,
-                lstm_layers=self.lstm_num_layers,
-                head_sizes=self.head_sizes,
-            ).to(device)
+            f"k_{i}": model_cls(**model_kwargs).to(device)
             for i in range(self.max_reasoning_level + 1)
         }
         if self.include_BR:
-            policies["BR"] = PPOLSTMModel(
-                input_size=np.prod(self.obs_space.shape),
-                num_actions=self.act_space.n,
-                trunk_sizes=self.trunk_sizes,
-                lstm_size=self.lstm_size,
-                lstm_layers=self.lstm_num_layers,
-                head_sizes=self.head_sizes,
-            ).to(device)
+            policies["BR"] = model_cls(**model_kwargs).to(device)
         policies["random"] = UniformRandomModel(self.act_space.n).to(device)
         return policies
 

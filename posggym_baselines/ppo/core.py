@@ -3,8 +3,8 @@ import contextlib
 import time
 from datetime import timedelta
 from multiprocessing.queues import Empty, Full
-from typing import TYPE_CHECKING, Dict, List, Optional, Union
 from pathlib import Path
+from typing import TYPE_CHECKING, Dict, List, Optional, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -15,9 +15,9 @@ import torch.optim as optim
 
 import posggym_baselines.ppo.utils as ppo_utils
 from posggym_baselines.ppo.eval import run_eval_worker
+from posggym_baselines.ppo.network import PPOModel
 from posggym_baselines.ppo.worker import run_rollout_worker
 from posggym_baselines.utils import logger
-from posggym_baselines.ppo.network import PPOModel
 
 
 if TYPE_CHECKING:

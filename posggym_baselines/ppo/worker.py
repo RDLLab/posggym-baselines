@@ -1,4 +1,5 @@
 """Implementation of rollout workers which collect trajectories for PPO training."""
+import contextlib
 from multiprocessing.queues import Empty
 
 import torch
@@ -6,7 +7,6 @@ import torch.multiprocessing as mp
 
 import posggym_baselines.ppo.utils as ppo_utils
 from posggym_baselines.ppo.config import PPOConfig
-import contextlib
 
 
 def run_rollout_worker(
@@ -64,10 +64,10 @@ def run_rollout_worker(
     dones_buf = torch.zeros((buf_shape[0] + 1, *buf_shape[1:])).to(device)
     values_buf = torch.zeros((buf_shape[0] + 1, *buf_shape[1:])).to(device)
     lstm_state_shape = (
-        config.lstm_num_layers,
+        config.lstm_num_layers if config.use_lstm else 1,
         config.num_envs,
         config.num_agents,
-        config.lstm_size,
+        config.lstm_size if config.use_lstm else 1,
     )
     lstm_states_buf = (
         torch.zeros((config.num_rollout_steps,) + lstm_state_shape).to(device),

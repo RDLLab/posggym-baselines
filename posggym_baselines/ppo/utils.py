@@ -5,7 +5,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-
 if TYPE_CHECKING:
     from posggym_baselines.ppo.config import PPOConfig
 

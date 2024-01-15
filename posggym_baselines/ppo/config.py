@@ -5,6 +5,7 @@ import random
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING, Dict, List, Optional, Union
+
 import numpy as np
 import torch
 from posggym.vector import SyncVectorEnv
@@ -18,9 +19,8 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     import gymnasium as gym
-
-    from posggym.agents.utils.processors import Processor
     from posggym.agents.policy import Policy
+    from posggym.agents.utils.processors import Processor
 
     from posggym_baselines.ppo.network import PPOModel
 

@@ -328,3 +328,113 @@ class PPOLSTMModel(PPOModel):
             self.critic(hidden),
             lstm_state,
         )
+
+
+class PPOMLPModel(PPOModel):
+    """PPO MLP model class.
+
+    Has linear trunk with tanh activations the output of which is split into two heads,
+    one for the actor (policy) and one for the (critic) value function.
+
+    """
+
+    def __init__(
+        self,
+        input_size: int,
+        num_actions: int,
+        trunk_sizes: List[int],
+        head_sizes: List[int],
+    ):
+        super().__init__()
+        self.input_size = input_size
+        self.num_actions = num_actions
+
+        prev_size = input_size
+        trunk = []
+        for size in trunk_sizes:
+            trunk += [
+                layer_init(nn.Linear(prev_size, size)),
+                nn.Tanh(),
+            ]
+            prev_size = size
+        self.trunk = nn.Sequential(*trunk)
+
+        actor = []
+        critic = []
+        for size in head_sizes:
+            actor += [
+                layer_init(nn.Linear(prev_size, size)),
+                nn.Tanh(),
+            ]
+            critic += [
+                layer_init(nn.Linear(prev_size, size)),
+                nn.Tanh(),
+            ]
+            prev_size = size
+
+        actor.append(layer_init(nn.Linear(prev_size, num_actions), std=0.01))
+        self.actor = nn.Sequential(*actor)
+
+        critic.append(
+            layer_init(nn.Linear(prev_size, 1), std=1),
+        )
+        self.critic = nn.Sequential(*critic)
+
+    def get_value(
+        self,
+        x: torch.tensor,
+        lstm_state: Optional[Tuple[torch.tensor, torch.tensor]],
+        done: torch.tensor,
+    ) -> torch.tensor:
+        hidden = self.trunk(x)
+        return self.critic(hidden)
+
+    def get_action(
+        self,
+        x: torch.tensor,
+        lstm_state: Optional[Tuple[torch.tensor, torch.tensor]],
+        done: torch.tensor,
+        action: Optional[torch.tensor] = None,
+    ) -> Tuple[
+        torch.tensor,
+        torch.tensor,
+        torch.tensor,
+        Optional[Tuple[torch.tensor, torch.tensor]],
+    ]:
+        hidden = self.trunk(x)
+        logits = self.actor(hidden)
+        probs = Categorical(logits=logits)
+        if action is None:
+            action = probs.sample()
+        return (
+            action,
+            probs.log_prob(action),
+            probs.entropy(),
+            lstm_state,
+        )
+
+    def get_action_and_value(
+        self,
+        x: torch.tensor,
+        lstm_state: Optional[Tuple[torch.tensor, torch.tensor]],
+        done: torch.tensor,
+        action: Optional[torch.tensor] = None,
+    ) -> Tuple[
+        torch.tensor,
+        torch.tensor,
+        torch.tensor,
+        torch.tensor,
+        Optional[Tuple[torch.tensor, torch.tensor]],
+    ]:
+        hidden = self.trunk(x)
+        logits = self.actor(hidden)
+        probs = Categorical(logits=logits)
+        if action is None:
+            action = probs.sample()
+        return (
+            action,
+            probs.log_prob(action),
+            probs.entropy(),
+            self.critic(hidden),
+            lstm_state,
+        )
