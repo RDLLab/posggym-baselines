@@ -1,6 +1,0 @@
-"grid": "10x10"
-"num_predators": 2
-"num_prey": 3
-"cooperative": True
-"prey_strength": 2
-"obs_dim": 2

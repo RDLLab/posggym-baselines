@@ -3,22 +3,22 @@
 This module implements the independent PPO (IPPO) population, which is a population of
 independent PPO policies, where each policy is trained in self-play.
 """
-from dataclasses import dataclass
 import random
-from typing import Optional, Dict, List
+from dataclasses import dataclass
+from typing import Dict, List, Optional
 
 import numpy as np
 import torch
 
 from posggym_baselines.ppo.config import PPOConfig
-from posggym_baselines.ppo.network import PPOModel, PPOLSTMModel
+from posggym_baselines.ppo.network import PPOLSTMModel, PPOModel
 
 
 @dataclass
 class IPPOConfig(PPOConfig):
     # name of the experiment
     exp_name: str = "ippo"
-    # number of independent policies in the population
+    # number of independent policies in the population (not including BR)
     pop_size: int = 4
     # whether to train best-response policy on top of population
     include_BR: bool = False

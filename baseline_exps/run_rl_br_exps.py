@@ -4,24 +4,20 @@ import csv
 import math
 import time
 from copy import deepcopy
+from datetime import datetime
 from itertools import product
-from pprint import pprint
 from typing import Callable, Dict, Optional, Tuple
-from pathlib import Path
 
+import exp_utils
 import numpy as np
 import posggym
 import torch
-import yaml
 from posggym.agents.wrappers import AgentEnvWrapper
 from posggym.wrappers import FlattenObservations
 
-from posggym_baselines.exps.grid_world.train_br_ppo import DEFAULT_CONFIG
 from posggym_baselines.ppo.br_ppo import BRPPOConfig
 from posggym_baselines.ppo.network import PPOModel
 from posggym_baselines.utils import NoOverwriteRecordVideo, strtobool
-
-ENV_DATA_DIR = Path(__file__).resolve().parent / "env_data"
 
 
 def get_env_creator_fn(
@@ -59,80 +55,6 @@ def get_env_creator_fn(
         return env
 
     return thunk
-
-
-def get_env_data(env_id, agent_id):
-    """Get the env data for the given env name."""
-    if agent_id is None:
-        env_data_path = ENV_DATA_DIR / env_id
-    else:
-        env_data_path = ENV_DATA_DIR / f"{env_id}_{agent_id}"
-
-    env_kwargs_file = env_data_path / "env_kwargs.yaml"
-    with open(env_kwargs_file, "r") as f:
-        env_kwargs = yaml.safe_load(f)
-
-    agents_P0_file = env_data_path / (
-        "agents_P0.yaml" if agent_id is None else f"agents_P0_{agent_id}.yaml"
-    )
-
-    with open(agents_P0_file, "r") as f:
-        agents_P0 = yaml.safe_load(f)
-
-    agents_P1_file = env_data_path / (
-        "agents_P1.yaml" if agent_id is None else f"agents_P1_{agent_id}.yaml"
-    )
-
-    with open(agents_P1_file, "r") as f:
-        agents_P1 = yaml.safe_load(f)
-
-    br_models_dir = env_data_path / "br_models"
-
-    br_model_files = {"P0": {}, "P1": {}}
-    for model_file_name in br_models_dir.glob("*"):
-        model_name = model_file_name.name.replace(".pt", "")
-        tokens = model_name.split("_")
-        train_pop = tokens[0]
-        if agent_id is not None:
-            assert tokens[1].startswith("i")
-            assert tokens[1] == agent_id
-            seed = int(tokens[2].replace("seed", ""))
-        else:
-            seed = int(tokens[1].replace("seed", ""))
-        br_model_files[train_pop][seed] = br_models_dir / model_file_name
-
-    results_file = env_data_path / "br_results.csv"
-    return env_kwargs, agents_P0, agents_P1, br_model_files, results_file
-
-
-def load_config(
-    args,
-    env_kwargs,
-    other_agents,
-):
-    config_kwargs = deepcopy(DEFAULT_CONFIG)
-    config_kwargs.update(
-        {
-            "env_creator_fn": get_env_creator_fn,
-            "env_id": env_kwargs["env_id"],
-            "env_kwargs": env_kwargs["env_kwargs"],
-            "eval_device": "cuda" if args.cuda else "cpu",
-            "track_wandb": False,
-            "disable_logging": True,
-            "eval_episodes": args.num_episodes,
-        }
-    )
-
-    for k, v in vars(args).items():
-        if k in config_kwargs:
-            config_kwargs[k] = v
-
-    config = BRPPOConfig(
-        # BR-PPO specific config
-        other_agent_ids=other_agents,
-        **config_kwargs,
-    )
-    return config
 
 
 def run_evaluation_episodes(
@@ -235,21 +157,42 @@ def run_evaluation_episodes(
 
 def main(args):
     torch.set_num_threads(1)
-    env_kwargs, agents_P0, agents_P1, br_model_files, results_file = get_env_data(
-        args.env_id, args.agent_id
+    env_data = exp_utils.get_env_data(None, None, full_env_id=args.full_env_id)
+    env_data.pprint()
+    print()
+
+    config_kwargs = deepcopy(exp_utils.DEFAULT_PPO_CONFIG)
+    config_kwargs.update(
+        {
+            "env_creator_fn": get_env_creator_fn,
+            "env_id": env_data.env_kwargs["env_id"],
+            "env_kwargs": env_data.env_kwargs["env_kwargs"],
+            "eval_device": "cuda" if args.cuda else "cpu",
+            "track_wandb": False,
+            "disable_logging": True,
+            "eval_episodes": args.num_episodes,
+        }
     )
-    print("env_kwargs:")
-    pprint(env_kwargs)
-    print("agents_P0:")
-    pprint(agents_P0)
-    print("agents_P1:")
-    pprint(agents_P1)
-    pprint(br_model_files)
+    for k, v in vars(args).items():
+        if k in config_kwargs:
+            config_kwargs[k] = v
 
     configs = {
-        "P0": load_config(args, env_kwargs, agents_P0),
-        "P1": load_config(args, env_kwargs, agents_P1),
+        "P0": BRPPOConfig(
+            exp_name=f"BR-PPO_{args.full_env_id}_P0_eval",
+            other_agent_ids=env_data.agents_P0,
+            **config_kwargs,
+        ),
+        "P1": BRPPOConfig(
+            exp_name=f"BR-PPO_{args.full_env_id}_P1_eval",
+            other_agent_ids=env_data.agents_P1,
+            **config_kwargs,
+        ),
     }
+
+    results_file = exp_utils.RESULTS_DIR / (
+        f"BR-PPO_{args.full_env_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    )
     result_headers = [
         "env_id",
         "train_seed",
@@ -270,7 +213,7 @@ def main(args):
         test_config = configs[test_pop]
         br_policy = train_config.load_policies(device=test_config.eval_device)["BR"]
         br_policy.eval()
-        for seed, br_model_file in br_model_files[train_pop].items():
+        for seed, br_model_file in env_data.br_model_files[train_pop].items():
             print(f"Running BR-PPO eval for {train_pop} -> {test_pop} (seed {seed})")
             checkpoint = torch.load(br_model_file, map_location=test_config.eval_device)
             br_policy.load_state_dict(checkpoint["model"])
@@ -283,7 +226,7 @@ def main(args):
                 writer = csv.DictWriter(f, fieldnames=result_headers)
                 writer.writerow(
                     {
-                        "env_id": args.env_id,
+                        "env_id": env_data.env_id,
                         "train_seed": seed,
                         "train_pop": train_pop,
                         "eval_pop": test_pop,
@@ -297,16 +240,19 @@ if __name__ == "__main__":
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument(
-        "--env_id",
+        "--full_env_id",
         type=str,
         required=True,
-        help="Name of environment.",
-    )
-    parser.add_argument(
-        "--agent_id",
-        type=str,
-        default=None,
-        help="ID of agent.",
+        choices=[
+            "CooperativeReaching-v0",
+            "Driving-v1",
+            "LevelBasedForaging-v3",
+            "PredatorPrey-v0",
+            "PursuitEvasion-v1_i0",
+            "PursuitEvasion-v1_i1",
+            "all",
+        ],
+        help="Name of environment to train on.",
     )
     parser.add_argument(
         "--capture_video",
@@ -328,22 +274,10 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    if args.env_id == "all":
+    if args.full_env_id == "all":
         print("Running all envs")
-        for env_id_folder in ENV_DATA_DIR.glob("*"):
-            env_id = env_id_folder.name
-            if env_id == "Driving-v1":
-                continue
-            if env_id.endswith("_i0"):
-                agent_id = "i0"
-                env_id = env_id.replace("_i0", "")
-            elif env_id.endswith("_i1"):
-                agent_id = "i1"
-                env_id = env_id.replace("_i1", "")
-            else:
-                agent_id = None
-            args.env_id = env_id
-            args.agent_id = agent_id
+        for full_env_id in exp_utils.load_all_env_data():
+            args.full_env_id = full_env_id
             print()
             main(args)
     else:

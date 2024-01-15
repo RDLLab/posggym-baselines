@@ -52,10 +52,10 @@ DEFAULT_PLANNING_CONFIG_KWARGS_UCB["truncated"] = False
 DEFAULT_PLANNING_CONFIG_KWARGS_UCB["c"] = math.sqrt(2)
 
 
-DEFAULT_RL_CONFIG = {
+DEFAULT_PPO_CONFIG = {
     "eval_fns": [],
     # general config
-    "exp_name": "br_ppo",
+    # "exp_name": "br_ppo",  # added later
     "seed": 0,
     "cuda": True,
     "torch_deterministic": False,
@@ -164,6 +164,15 @@ class EnvData:
     planning_summary_results_file: Path
     combined_results_file: Path
 
+    def pprint(self, exlude_large_entries: bool = True):
+        output = [f"EnvData ({self.full_env_id}):"]
+        for field_name, field_value in self.__dict__.items():
+            if exlude_large_entries and field_name in ["meta_policy", "br_model_files"]:
+                continue
+            formated_value = pprint.pformat(field_value, depth=2, indent=4)
+            output.append(f"{field_name}={formated_value}")
+        print("\n  ".join(output))
+
 
 # TODO remove env_id and agent_id and use full_env_id only
 #      (do this after all experiments are done)
@@ -244,7 +253,7 @@ def get_env_data(
             seed = int(tokens[2].replace("seed", ""))
         else:
             seed = int(tokens[1].replace("seed", ""))
-        br_model_files[train_pop][seed] = br_models_dir
+        br_model_files[train_pop][seed] = br_models_dir / model_file_name
 
     # Planninn Data
     meta_policy_file = env_data_path / "meta_policy.yaml"

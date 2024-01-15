@@ -1,8 +1,0 @@
-"num_agents": 2
-"max_agent_level": 3
-"size": 10
-"max_food": 8
-"sight": 2
-"force_coop": False
-"static_layout": True
-"observation_mode": "tuple"

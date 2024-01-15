@@ -46,7 +46,7 @@ class UniformOtherAgentFn:
 class BRPPOConfig(PPOConfig):
     # name of the experiment
     exp_name: str = "br_ppo"
-    # other agent policy ids
+    # other agent policy ids, maps agent id to list of posggym.agents policy ids
     other_agent_ids: Dict[str, List[str]] = None
 
     def __post_init__(self):
