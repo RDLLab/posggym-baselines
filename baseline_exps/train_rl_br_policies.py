@@ -61,12 +61,14 @@ def train(args):
         other_agent_policy_ids = env_data.agents_P1
 
     config_kwargs = deepcopy(exp_utils.DEFAULT_PPO_CONFIG)
+    exp_name = f"BR-PPO_{args.full_env_id}_{args.other_agent_population}"
     config_kwargs.update(
         {
-            "exp_name": f"BR-PPO_{args.full_env_id}_{args.other_agent_population}",
+            "exp_name": exp_name,
             "env_creator_fn": get_env_creator_fn,
             "env_id": env_kwargs["env_id"],
             "env_kwargs": env_kwargs["env_kwargs"],
+            "wandb_group": exp_name,
         }
     )
 
@@ -112,12 +114,6 @@ if __name__ == "__main__":
         type=strtobool,
         default=True,
         help="Whether to track the experiment with wandb.",
-    )
-    parser.add_argument(
-        "--wandb_group",
-        type=str,
-        default=None,
-        help="Optional wandb group name.",
     )
     parser.add_argument(
         "--disable_logging",
