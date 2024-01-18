@@ -12,10 +12,10 @@ import posggym
 import psutil
 import yaml
 from posggym.agents.wrappers import AgentEnvWrapper
-
 from posggym_baselines.planning.config import MCTSConfig
 from posggym_baselines.planning.utils import PlanningStatTracker
 from posggym_baselines.utils.agent_env_wrapper import UniformOtherAgentFn
+
 
 BASELINE_EXP_DIR = Path(__file__).resolve().parent
 ENV_DATA_DIR = BASELINE_EXP_DIR / "env_data"
@@ -154,6 +154,7 @@ class EnvData:
     # [P0, P1] -> [seed] -> model_file
     br_model_files: Dict[str, Dict[int, Path]]
     rl_br_results_file: Path
+    rl_br_training_results_files: Dict[str, Path]
 
     # Planning data
     # Meta policy pop_id -> meta_policy_type -> meta_policy
@@ -275,6 +276,9 @@ def get_env_data(
         policy_name_to_id=policy_name_to_id,
         br_model_files=br_model_files,
         rl_br_results_file=env_data_path / "br_results.csv",
+        rl_br_training_results_files={
+            p: env_data_path / f"{p}_br_training_results.csv" for p in ["P0", "P1"]
+        },
         meta_policy=meta_policy,
         planning_results_file=env_data_path / "planning_results.csv",
         planning_summary_results_file=env_data_path / "planning_summary_results.csv",
