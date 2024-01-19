@@ -12,6 +12,8 @@ import exp_utils
 import run_planning_exp as planning_exps
 import torch
 
+from posggym_baselines.utils import strtobool
+
 
 def main(args):
     print("Running experiments with the following parameters:")
@@ -145,6 +147,12 @@ if __name__ == "__main__":
         type=int,
         default=exp_utils.DEFAULT_EXP_TIME_LIMIT,
         help="Number of episodes to evaluate.",
+    )
+    parser.add_argument(
+        "--track_belief_stats",
+        type=strtobool,
+        default=False,
+        help="Whether to track belief accuracy statistics.",
     )
     parser.add_argument(
         "--n_cpus",

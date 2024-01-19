@@ -74,6 +74,24 @@ class OtherAgentPolicy(abc.ABC):
 
         """
 
+    @abc.abstractmethod
+    def get_pi(self, state: PolicyState) -> Dict[M.ActType, float]:
+        """Get policy's distribution over actions for given policy state.
+
+        Subclasses must implement this method
+
+        Arguments
+        ---------
+        state : PolicyState
+            the policy's current state
+
+        Returns
+        -------
+        pi : Dict[M.ActType, float]
+            the policy's distribution over actions
+
+        """
+
     def get_state_from_history(
         self, initial_state: PolicyState, history: AgentHistory
     ) -> PolicyState:
@@ -132,6 +150,9 @@ class RandomOtherAgentPolicy(OtherAgentPolicy):
     def sample_action(self, state: PolicyState) -> M.ActType:
         return self._action_space.sample()
 
+    def get_pi(self, state: PolicyState) -> Dict[M.ActType, float]:
+        return {a: 1.0 / self._action_space.n for a in range(self._action_space.n)}
+
 
 class OtherAgentMixturePolicy(OtherAgentPolicy):
     """Other agent mixture policy.
@@ -153,6 +174,7 @@ class OtherAgentMixturePolicy(OtherAgentPolicy):
         super().__init__(model, agent_id)
         assert len(model.possible_agents) == 2, "Currently only supports 2 agents"
         self.policies = policies
+        self.action_space = list(range(model.action_spaces[agent_id].n))
 
     def sample_initial_state(self) -> PolicyState:
         policy_id = random.choice(list(self.policies))
@@ -178,6 +200,17 @@ class OtherAgentMixturePolicy(OtherAgentPolicy):
         policy_id = state["policy_id"]
         policy_state = state["policy_state"]
         return self.policies[policy_id].sample_action(policy_state)
+
+    def get_pi(self, state: PolicyState) -> Dict[M.ActType, float]:
+        policy_id = state["policy_id"]
+        policy_state = state["policy_state"]
+        pi = self.policies[policy_id].get_pi(policy_state).probs
+
+        if len(pi) != len(self.action_space):
+            for a in self.action_space:
+                if a not in pi:
+                    pi[a] = 0.0
+        return pi
 
     def close(self):
         for policy in self.policies.values():

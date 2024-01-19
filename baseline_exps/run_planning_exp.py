@@ -41,7 +41,6 @@ import exp_utils
 import posggym
 import torch
 from exp_utils import PlanningExpParams
-
 from posggym_baselines.planning.config import MCTSConfig
 from posggym_baselines.planning.intmcp import INTMCP
 from posggym_baselines.planning.ipomcp import IPOMCP
@@ -49,6 +48,8 @@ from posggym_baselines.planning.other_policy import OtherAgentMixturePolicy
 from posggym_baselines.planning.pomcp import POMCP
 from posggym_baselines.planning.potmmcp import POTMMCP, POTMMCPMetaPolicy
 from posggym_baselines.planning.search_policy import RandomSearchPolicy
+from posggym_baselines.utils import strtobool
+
 
 # same as in I-POMCP paper experiments
 # also best performing value in I-NTMCP paper
@@ -76,6 +77,10 @@ def get_intmcp_exp_params(
     config_kwargs = dict(exp_utils.DEFAULT_PLANNING_CONFIG_KWARGS_UCB)
     config_kwargs["truncated"] = False
 
+    belief_stats_to_track = []
+    if args.track_belief_stats:
+        belief_stats_to_track = ["state", "history"]
+
     all_exp_params = []
     exp_num = 0
     for planning_pop_id, test_pop_id, search_time in itertools.product(
@@ -100,6 +105,7 @@ def get_intmcp_exp_params(
             planning_pop_id=planning_pop_id,
             test_pop_id=test_pop_id,
             full_env_id=env_data.full_env_id,
+            belief_stats_to_track=[*belief_stats_to_track],
         )
         all_exp_params.append(exp_params)
         exp_num += 1
@@ -131,6 +137,10 @@ def get_ipomcp_exp_params(
     config_kwargs = dict(exp_utils.DEFAULT_PLANNING_CONFIG_KWARGS_UCB)
     config_kwargs["truncated"] = False
 
+    belief_stats_to_track = []
+    if args.track_belief_stats:
+        belief_stats_to_track = ["state", "history", "action", "policy"]
+
     # generate all experiment parameters
     all_exp_params = []
     exp_num = 0
@@ -160,6 +170,7 @@ def get_ipomcp_exp_params(
             planning_pop_id=planning_pop_id,
             test_pop_id=test_pop_id,
             full_env_id=env_data.full_env_id,
+            belief_stats_to_track=[*belief_stats_to_track],
         )
         all_exp_params.append(exp_params)
         exp_num += 1
@@ -184,6 +195,10 @@ def get_pomcp_exp_params(
     config_kwargs["truncated"] = False
     config_kwargs["state_belief_only"] = True
 
+    belief_stats_to_track = []
+    if args.track_belief_stats:
+        belief_stats_to_track = ["state"]
+
     # generate all experiment parameters
     all_exp_params = []
     exp_num = 0
@@ -207,6 +222,7 @@ def get_pomcp_exp_params(
             planning_pop_id=planning_pop_id,
             test_pop_id=test_pop_id,
             full_env_id=env_data.full_env_id,
+            belief_stats_to_track=[*belief_stats_to_track],
         )
         all_exp_params.append(exp_params)
         exp_num += 1
@@ -237,6 +253,10 @@ def init_potmmcp(model: posggym.POSGModel, exp_params: PlanningExpParams) -> POT
 def get_potmmcp_exp_params(
     args, env_data: exp_utils.EnvData, exp_name: str, exp_results_parent_dir: Path
 ) -> List[PlanningExpParams]:
+    belief_stats_to_track = []
+    if args.track_belief_stats:
+        belief_stats_to_track = ["state", "history", "action", "policy"]
+
     all_exp_params = []
     exp_num = 0
     for planning_pop_id, test_pop_id, search_time in itertools.product(
@@ -271,6 +291,7 @@ def get_potmmcp_exp_params(
             planning_pop_id=planning_pop_id,
             test_pop_id=test_pop_id,
             full_env_id=env_data.full_env_id,
+            belief_stats_to_track=[*belief_stats_to_track],
         )
         all_exp_params.append(exp_params)
         exp_num += 1
@@ -387,6 +408,12 @@ if __name__ == "__main__":
         type=int,
         default=exp_utils.DEFAULT_EXP_TIME_LIMIT,
         help="Number of episodes to evaluate.",
+    )
+    parser.add_argument(
+        "--track_belief_stats",
+        type=strtobool,
+        default=False,
+        help="Whether to track belief accuracy statistics.",
     )
     parser.add_argument(
         "--n_cpus",

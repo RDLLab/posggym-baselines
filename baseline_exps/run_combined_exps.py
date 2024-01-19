@@ -39,6 +39,7 @@ from posggym_baselines.planning.mcts import MCTS
 from posggym_baselines.planning.other_policy import OtherAgentMixturePolicy
 from posggym_baselines.planning.search_policy import PPOLSTMSearchPolicy
 from posggym_baselines.ppo.network import PPOLSTMModel
+from posggym_baselines.utils import strtobool
 
 # Number of different seeds used to train RL policies
 NUM_RL_POLICY_SEEDS = 5
@@ -97,8 +98,13 @@ def get_combined_exp_params(
     search_times: List[float],
     num_episodes: int,
     exp_time_limit: int,
+    track_belief_stats: bool,
 ) -> List[CombinedExpParams]:
     config_kwargs = dict(exp_utils.DEFAULT_PLANNING_CONFIG_KWARGS_PUCB)
+
+    belief_stats_to_track = []
+    if track_belief_stats:
+        belief_stats_to_track = ["state", "history", "action", "policy"]
 
     # generate all experiment parameters
     all_exp_params = []
@@ -132,6 +138,7 @@ def get_combined_exp_params(
             rl_policy_seed=rl_seed,
             rl_policy_pop_id=planning_pop_id,
             env_data_dir=env_data.env_data_dir,
+            belief_stats_to_track=[*belief_stats_to_track],
         )
         all_exp_params.append(exp_params)
         exp_num += 1
@@ -174,6 +181,7 @@ def main(args):
             args.search_times,
             args.num_episodes,
             args.exp_time_limit,
+            args.track_belief_stats,
         )
         all_exp_params.extend(exp_params)
 
@@ -235,6 +243,12 @@ if __name__ == "__main__":
         type=int,
         default=exp_utils.DEFAULT_EXP_TIME_LIMIT,
         help="Number of episodes to evaluate.",
+    )
+    parser.add_argument(
+        "--track_belief_stats",
+        type=strtobool,
+        default=False,
+        help="Whether to track belief accuracy statistics.",
     )
     parser.add_argument(
         "--n_cpus",
