@@ -110,7 +110,7 @@ def combine_all_experiment_results(
     parent_dir: Path,
     save_to_file: bool = True,
     summarize: bool = True,
-    save_to_main_results_dir: bool = False,
+    save_to_main: bool = False,
     combined: bool = False,
 ) -> Dict[str, pd.DataFrame]:
     """Combine results from all experiments (alg, env) in `parent_dir`.
@@ -130,7 +130,7 @@ def combine_all_experiment_results(
         Whether to summarize results over all episodes. If True, will compute mean,
         std, and 95% confidence interval over all episodes for each (alg, env)
         sub-experiment Otherwise results will contain results for each episode.
-    save_to_main_results_dir
+    save_to_main
         Whether to save results to main `env_data` dir. Will overwrite existing
         results so be careful.
     combined
@@ -189,7 +189,7 @@ def combine_all_experiment_results(
         suffix = "combined" + suffix if combined else "planning" + suffix
 
         for env_id in all_env_results:
-            if save_to_main_results_dir:
+            if save_to_main:
                 env_save_file = ENV_DATA_DIR / env_id / suffix
             else:
                 env_save_file = parent_dir / f"{env_id}_{suffix}"
@@ -222,7 +222,7 @@ if __name__ == "__main__":
         help="Whether to summarize results across episodes",
     )
     parser.add_argument(
-        "--save_to_main_results_dir",
+        "--save_to_main",
         action="store_true",
         help=(
             "Whether to save results to main `env_data` dir. Will overwrite existing "
@@ -243,6 +243,6 @@ if __name__ == "__main__":
             combine_all_experiment_results(
                 parent_dir,
                 summarize=args.summarize,
-                save_to_main_results_dir=args.save_to_main_results_dir,
+                save_to_main=args.save_to_main,
                 combined=args.combined,
             )

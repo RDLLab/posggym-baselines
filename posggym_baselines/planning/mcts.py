@@ -58,7 +58,9 @@ class MCTS:
             self.step_limit = float("inf")
 
         self._reinvigorator = B.BeliefRejectionSampler(
-            model, config.state_belief_only, sample_limit=4 * self.config.num_particles
+            model,
+            config.state_belief_only,
+            sample_limit_factor=config.reinvigoration_sample_limit_factor,
         )
 
         if config.action_selection == "pucb":

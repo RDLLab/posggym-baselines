@@ -17,6 +17,7 @@ class MCTSConfig:
     pucb_exploration_fraction: float = 0.25
     known_bounds: Optional[KnownBounds] = None
     extra_particles_prop: float = 1.0 / 16
+    reinvigoration_sample_limit_factor: float = 4.0
     step_limit: Optional[int] = None
     epsilon: float = 0.01
     seed: Optional[int] = None

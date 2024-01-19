@@ -12,10 +12,10 @@ import posggym
 import psutil
 import yaml
 from posggym.agents.wrappers import AgentEnvWrapper
+
 from posggym_baselines.planning.config import MCTSConfig
 from posggym_baselines.planning.utils import PlanningStatTracker
 from posggym_baselines.utils.agent_env_wrapper import UniformOtherAgentFn
-
 
 BASELINE_EXP_DIR = Path(__file__).resolve().parent
 ENV_DATA_DIR = BASELINE_EXP_DIR / "env_data"
@@ -37,6 +37,7 @@ DEFAULT_PLANNING_CONFIG_KWARGS_PUCB = {
     "pucb_exploration_fraction": 0.5,
     "known_bounds": None,
     "extra_particles_prop": 1.0 / 16,
+    "reinvigoration_sample_limit_factor": 4.0,
     "step_limit": None,  # Set in algorithm, if env has a step limit
     "epsilon": 0.01,
     "seed": None,
