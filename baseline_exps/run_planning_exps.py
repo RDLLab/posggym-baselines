@@ -1,9 +1,13 @@
 """Script for running planning baseline experiments.
 
-For a given planning algorithm and baseline environment runs the planning algorithm for
-`num_episodes` episodes for selected `search_times` save the results to a file.
-Runs the algorithm for both population `P0` and `P1` and tests against both
-populations, leading to 4 * |`search_times`| experiments.
+For given planning algorithm and baseline environment the script runs the planning
+algorithm for `num_episodes` episodes for selected `search_times` and saves the results
+to a file. Experiments are run both population `P0` and `P1` as the planning population
+and tested  against both populations, leading to 4 * |`search_times`| experiments.
+
+The script can be used to run multiple planning algorithms and multiple environments.
+Furthermore individual experiments can be run in parallel using multiple cpus (see
+`n_cpus` argument).
 
 Available algorithms:
 
@@ -23,15 +27,25 @@ Available environments:
 
 Examples:
 
-    # run INTMCP on Driving-v1 for 100 episodes for 1s and 10s
-    python run_planning_exp.py INTMCP --env_id Driving-v1 --search_times 1 10
+    # run INTMCP on Driving-v1 for 100 episodes for 1s and 10s search times
+    python run_planning_exps.py \
+        --alg_names INTMCP \
+        --full_env_ids Driving-v1 \
+        --search_times 1 10
+
+    # run all algorithms on all environments for 100 episodes with 10 cpus
+    python run_planning_exps.py \
+        --alg_names all \
+        --full_env_ids all \
+        --search_times 1 10 \
+        --num_episodes 100 \
+        --n_cpus 10
 
 """
 import argparse
 import copy
 import itertools
 import multiprocessing as mp
-import pprint
 import time
 from datetime import datetime
 from pathlib import Path
@@ -41,6 +55,7 @@ import exp_utils
 import posggym
 import torch
 from exp_utils import PlanningExpParams
+
 from posggym_baselines.planning.config import MCTSConfig
 from posggym_baselines.planning.intmcp import INTMCP
 from posggym_baselines.planning.ipomcp import IPOMCP
@@ -49,7 +64,6 @@ from posggym_baselines.planning.pomcp import POMCP
 from posggym_baselines.planning.potmmcp import POTMMCP, POTMMCPMetaPolicy
 from posggym_baselines.planning.search_policy import RandomSearchPolicy
 from posggym_baselines.utils import strtobool
-
 
 # same as in I-POMCP paper experiments
 # also best performing value in I-NTMCP paper
@@ -301,60 +315,77 @@ def get_potmmcp_exp_params(
 
 def main(args):
     print("Running experiments with the following parameters:")
-    print("Env ID:", args.env_id)
-    print("Agent ID:", args.agent_id)
+    print("Algorithms:", args.alg_names)
+    print("Env IDs:", args.full_env_ids)
+    print("Nesting level:", args.nesting_level)
     print("Num episodes:", args.num_episodes)
     print("Search times:", args.search_times)
     print("Exp time limit:", args.exp_time_limit)
+    print("N cpus:", args.n_cpus)
 
     # limit number of threads to 1 for each process
     torch.set_num_threads(1)
 
-    env_data = exp_utils.get_env_data(args.env_id, args.agent_id)
-    print("env_kwargs:")
-    pprint.pprint(env_data.env_kwargs)
-    print("agents_P0:")
-    pprint.pprint(env_data.agents_P0)
-    print("agents_P1:")
-    pprint.pprint(env_data.agents_P1)
+    if args.alg_names == ["all"]:
+        args.alg_names = ["INTMCP", "IPOMCP", "POMCP", "POTMMCP"]
+    if "all" in args.full_env_ids:
+        args.full_env_ids = [
+            "CooperativeReaching-v0",
+            "Driving-v1",
+            "LevelBasedForaging-v3",
+            "PredatorPrey-v0",
+            "PursuitEvasion-v1_i0",
+            "PursuitEvasion-v1_i1",
+        ]
 
-    exp_name = f"{args.alg_name}_{args.env_id}"
-    if args.agent_id is not None:
-        exp_name += f"_i{args.agent_id}"
-    exp_name += f"_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    all_exp_params = []
+    for alg_name, full_env_id in itertools.product(args.alg_names, args.full_env_ids):
+        tokens = full_env_id.split("_")
+        if len(tokens) == 1:
+            env_id = full_env_id
+            agent_id = None
+        elif len(tokens) == 2:
+            env_id = tokens[0]
+            agent_id = tokens[1].replace("i", "")
+        else:
+            raise ValueError("Invalid full_env_id: {}".format(full_env_id))
 
-    exp_results_parent_dir = exp_utils.RESULTS_DIR / exp_name
-    exp_results_parent_dir.mkdir(exist_ok=True)
+        env_data = exp_utils.get_env_data(env_id, agent_id)
+        exp_name = f"{alg_name}_{env_id}"
+        if agent_id is not None:
+            exp_name += f"_i{agent_id}"
+        exp_name += f"_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
-    if args.alg_name == "INTMCP":
-        all_exp_params = get_intmcp_exp_params(
-            args, env_data, exp_name, exp_results_parent_dir
-        )
-    elif args.alg_name == "IPOMCP":
-        all_exp_params = get_ipomcp_exp_params(
-            args, env_data, exp_name, exp_results_parent_dir
-        )
-    elif args.alg_name == "POMCP":
-        all_exp_params = get_pomcp_exp_params(
-            args, env_data, exp_name, exp_results_parent_dir
-        )
-    elif args.alg_name == "POTMMCP":
-        all_exp_params = get_potmmcp_exp_params(
-            args, env_data, exp_name, exp_results_parent_dir
-        )
-    else:
-        raise ValueError(f"Unknown algorithm name: {args.alg_name}")
+        exp_results_parent_dir = exp_utils.RESULTS_DIR / exp_name
+        exp_results_parent_dir.mkdir(exist_ok=True)
+
+        if alg_name == "INTMCP":
+            exp_params = get_intmcp_exp_params(
+                args, env_data, exp_name, exp_results_parent_dir
+            )
+        elif alg_name == "IPOMCP":
+            exp_params = get_ipomcp_exp_params(
+                args, env_data, exp_name, exp_results_parent_dir
+            )
+        elif alg_name == "POMCP":
+            exp_params = get_pomcp_exp_params(
+                args, env_data, exp_name, exp_results_parent_dir
+            )
+        elif alg_name == "POTMMCP":
+            exp_params = get_potmmcp_exp_params(
+                args, env_data, exp_name, exp_results_parent_dir
+            )
+        else:
+            raise ValueError(f"Unknown algorithm name: {alg_name}")
+        all_exp_params.extend(exp_params)
 
     print(f"Total number of experiments={len(all_exp_params)}")
 
     start_time = time.time()
     # run experiments
-    if args.n_cpus == 1:
-        for exp_params in all_exp_params:
-            exp_utils.run_planning_exp(exp_params)
-    else:
-        with mp.Pool(args.n_cpus, maxtasksperchild=1) as pool:
-            pool.map(exp_utils.run_planning_exp, all_exp_params)
+    with mp.Pool(args.n_cpus, maxtasksperchild=1) as pool:
+        print("Running experiments...")
+        pool.map(exp_utils.run_planning_exp, all_exp_params)
 
     time_taken = time.time() - start_time
     hours, rem = divmod(time_taken, 3600)
@@ -367,22 +398,28 @@ if __name__ == "__main__":
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument(
-        "alg_name",
+        "--alg_names",
         type=str,
-        choices=["INTMCP", "IPOMCP", "POMCP", "POTMMCP"],
+        nargs="+",
+        required=True,
+        choices=["INTMCP", "IPOMCP", "POMCP", "POTMMCP", "all"],
         help="Planning algorithm to run.",
     )
     parser.add_argument(
-        "--env_id",
+        "--full_env_ids",
         type=str,
+        nargs="+",
         required=True,
+        choices=[
+            "CooperativeReaching-v0",
+            "Driving-v1",
+            "LevelBasedForaging-v3",
+            "PredatorPrey-v0",
+            "PursuitEvasion-v1_i0",
+            "PursuitEvasion-v1_i1",
+            "all",
+        ],
         help="Name of environment.",
-    )
-    parser.add_argument(
-        "--agent_id",
-        type=str,
-        default=None,
-        help="ID of agent.",
     )
     parser.add_argument(
         "--nesting_level",
@@ -422,26 +459,4 @@ if __name__ == "__main__":
         help="Number of cpus to use for running experiments in parallel.",
     )
     args = parser.parse_args()
-
-    if args.env_id == "all":
-        print("Running all envs")
-        for env_id_folder in exp_utils.ENV_DATA_DIR.glob("*"):
-            env_id = env_id_folder.name
-            if not env_id_folder.is_dir():
-                continue
-            if env_id.endswith("_i0"):
-                agent_id = "0"
-                env_id = env_id.replace("_i0", "")
-            elif env_id.endswith("_i1"):
-                agent_id = "1"
-                env_id = env_id.replace("_i1", "")
-            else:
-                agent_id = None
-            args.env_id = env_id
-            args.agent_id = agent_id
-            print()
-            main(args)
-    else:
-        if args.agent_id == "" or args.agent_id == "None":
-            args.agent_id = None
-        main(args)
+    main(args)
