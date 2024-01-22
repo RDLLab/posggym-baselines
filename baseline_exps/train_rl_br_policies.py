@@ -13,7 +13,6 @@ import exp_utils
 import posggym
 from posggym.agents.wrappers import AgentEnvWrapper
 from posggym.wrappers import FlattenObservations, RecordVideo
-
 from posggym_baselines.ppo.br_ppo import BRPPOConfig
 from posggym_baselines.ppo.config import PPOConfig
 from posggym_baselines.ppo.core import run_ppo
@@ -156,5 +155,11 @@ if __name__ == "__main__":
         type=strtobool,
         default=True,
         help="Whether to use LSTM based policy network for learner.",
+    )
+    parser.add_argument(
+        "--save_interval",
+        type=int,
+        default=-1,
+        help="Interval between of updates to save model (-1 is save at end only).",
     )
     train(parser.parse_args())

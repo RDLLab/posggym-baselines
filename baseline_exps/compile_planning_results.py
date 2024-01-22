@@ -88,7 +88,9 @@ def compile_sub_experiment_results(
             exp_args = yaml.safe_load(f)
 
         for k, v in exp_args.items():
-            if k == "num_episodes":
+            if k == "belief_stats_to_track":
+                continue
+            elif k == "num_episodes":
                 k = "num_episodes_limit"
             sub_exp_results_df.insert(0, k, v)
 
