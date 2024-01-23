@@ -12,10 +12,10 @@ import posggym
 import psutil
 import yaml
 from posggym.agents.wrappers import AgentEnvWrapper
+
 from posggym_baselines.planning.config import MCTSConfig
 from posggym_baselines.planning.utils import BeliefStatTracker, PlanningStatTracker
 from posggym_baselines.utils.agent_env_wrapper import UniformOtherAgentFn
-
 
 BASELINE_EXP_DIR = Path(__file__).resolve().parent
 ENV_DATA_DIR = BASELINE_EXP_DIR / "env_data"
@@ -176,22 +176,14 @@ class EnvData:
         print("\n  ".join(output))
 
 
-# TODO remove env_id and agent_id and use full_env_id only
-#      (do this after all experiments are done)
-def get_env_data(
-    env_id: Optional[str], agent_id: Optional[str], full_env_id: Optional[str] = None
-):
+def get_env_data(full_env_id: str):
     """Get the env data for the given env name."""
-    if full_env_id is None:
-        assert env_id is not None
-        full_env_id = env_id if agent_id is None else f"{env_id}_i{agent_id}"
+    if len(full_env_id.split("_")) == 2:
+        env_id, agent_id = full_env_id.split("_")
+        agent_id = agent_id.replace("i", "")
     else:
-        if len(full_env_id.split("_")) == 2:
-            env_id, agent_id = full_env_id.split("_")
-            agent_id = agent_id.replace("i", "")
-        else:
-            env_id = full_env_id
-            agent_id = None
+        env_id = full_env_id
+        agent_id = None
     env_data_path = ENV_DATA_DIR / full_env_id
 
     env_kwargs_file = env_data_path / "env_kwargs.yaml"
@@ -292,9 +284,9 @@ def load_all_env_data() -> Dict[str, EnvData]:
     all_env_data = {}
     full_env_ids = sorted([f.name for f in ENV_DATA_DIR.glob("*")])
     for full_env_id in full_env_ids:
-        if not (ENV_DATA_DIR / full_env_id).is_dir():
+        if not (ENV_DATA_DIR / full_env_id).is_dir() or full_env_id == "figures":
             continue
-        all_env_data[full_env_id] = get_env_data(None, None, full_env_id=full_env_id)
+        all_env_data[full_env_id] = get_env_data(full_env_id)
     return all_env_data
 
 

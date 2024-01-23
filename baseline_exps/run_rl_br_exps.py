@@ -90,6 +90,7 @@ def run_evaluation_episodes(
     per_env_disc_return = np.zeros((num_envs, num_agents))
 
     timesteps = np.zeros((num_envs, 1))
+    ep_lens = []
     ep_returns = []
     ep_disc_returns = []
 
@@ -133,31 +134,25 @@ def run_evaluation_episodes(
 
         for env_idx, env_done in enumerate(dones):
             if env_done:
+                ep_lens.append(int(timesteps[env_idx]))
+                ep_returns.append(float(per_env_return[env_idx]))
+                ep_disc_returns.append(float(per_env_disc_return[env_idx]))
                 timesteps[env_idx] = 0
                 num_dones[env_idx] += 1
-                ep_returns.append(per_env_return[env_idx].copy())
-                ep_disc_returns.append(per_env_disc_return[env_idx].copy())
                 per_env_return[env_idx] = 0
                 per_env_disc_return[env_idx] = 0
 
     env.close()
-    mean_ep_returns = np.mean(ep_returns, axis=0)
-    std_ep_returns = np.std(ep_returns, axis=0)
-    mean_ep_disc_returns = np.mean(ep_disc_returns, axis=0)
-    std_ep_disc_returns = np.std(ep_disc_returns, axis=0)
-
     return {
-        "num_episodes": len(ep_returns),
-        "mean_returns": mean_ep_returns[0],
-        "std_returns": std_ep_returns[0],
-        "mean_discounted_returns": mean_ep_disc_returns[0],
-        "std_discounted_returns": std_ep_disc_returns[0],
+        "len": ep_lens,
+        "return": ep_returns,
+        "discounted_return": ep_disc_returns,
     }
 
 
 def main(args):
     torch.set_num_threads(1)
-    env_data = exp_utils.get_env_data(None, None, full_env_id=args.full_env_id)
+    env_data = exp_utils.get_env_data(args.full_env_id)
     env_data.pprint()
     print()
 
@@ -194,15 +189,13 @@ def main(args):
         f"BR-PPO_{args.full_env_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
     )
     result_headers = [
-        "env_id",
         "train_seed",
         "train_pop",
-        "eval_pop",
-        "num_episodes",
-        "mean_returns",
-        "std_returns",
-        "mean_discounted_returns",
-        "std_discounted_returns",
+        "test_pop",
+        "num",
+        "len",
+        "return",
+        "discounted_return",
     ]
     with open(results_file, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=result_headers)
@@ -224,15 +217,24 @@ def main(args):
 
             with open(results_file, "a", newline="") as f:
                 writer = csv.DictWriter(f, fieldnames=result_headers)
-                writer.writerow(
-                    {
-                        "env_id": env_data.env_id,
-                        "train_seed": seed,
-                        "train_pop": train_pop,
-                        "eval_pop": test_pop,
-                        **results,
-                    }
-                )
+                for num, (ep_len, ep_return, ep_disc_return) in enumerate(
+                    zip(
+                        results["len"],
+                        results["return"],
+                        results["discounted_return"],
+                    )
+                ):
+                    writer.writerow(
+                        {
+                            "train_seed": seed,
+                            "train_pop": train_pop,
+                            "test_pop": test_pop,
+                            "num": num,
+                            "len": ep_len,
+                            "return": ep_return,
+                            "discounted_return": ep_disc_return,
+                        }
+                    )
 
 
 if __name__ == "__main__":

@@ -13,6 +13,7 @@ import exp_utils
 import posggym
 from posggym.agents.wrappers import AgentEnvWrapper
 from posggym.wrappers import FlattenObservations, RecordVideo
+
 from posggym_baselines.ppo.br_ppo import BRPPOConfig
 from posggym_baselines.ppo.config import PPOConfig
 from posggym_baselines.ppo.core import run_ppo
@@ -51,7 +52,7 @@ def get_env_creator_fn(
 
 
 def train(args):
-    env_data = exp_utils.get_env_data(None, None, full_env_id=args.full_env_id)
+    env_data = exp_utils.get_env_data(args.full_env_id)
     env_kwargs = env_data.env_kwargs
 
     if args.other_agent_population == "P0":

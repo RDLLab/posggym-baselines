@@ -33,13 +33,13 @@ import posggym.model as M
 import torch
 from exp_utils import CombinedExpParams
 from posggym.agents.utils import processors
-
 from posggym_baselines.planning.config import MCTSConfig
 from posggym_baselines.planning.mcts import MCTS
 from posggym_baselines.planning.other_policy import OtherAgentMixturePolicy
 from posggym_baselines.planning.search_policy import PPOLSTMSearchPolicy
 from posggym_baselines.ppo.network import PPOLSTMModel
 from posggym_baselines.utils import strtobool
+
 
 # Number of different seeds used to train RL policies
 NUM_RL_POLICY_SEEDS = 5
@@ -168,7 +168,7 @@ def main(args):
 
     all_exp_params = []
     for full_env_id in args.full_env_ids:
-        env_data = exp_utils.get_env_data(None, None, full_env_id)
+        env_data = exp_utils.get_env_data(full_env_id)
         exp_name = f"COMBINED_{full_env_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
         exp_results_parent_dir = exp_utils.RESULTS_DIR / exp_name

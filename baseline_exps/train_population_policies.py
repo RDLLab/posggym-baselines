@@ -23,7 +23,6 @@ from typing import Callable, Optional
 import exp_utils
 import posggym
 from posggym.wrappers import FlattenObservations, RecordVideo
-
 from posggym_baselines.ppo.config import PPOConfig
 from posggym_baselines.ppo.core import run_ppo
 from posggym_baselines.ppo.ippo import IPPOConfig
@@ -56,7 +55,7 @@ def get_env_creator_fn(
 
 def train(args):
     """Run training for KLR and KLR plus BR."""
-    env_data = exp_utils.get_env_data(None, None, full_env_id=args.full_env_id)
+    env_data = exp_utils.get_env_data(args.full_env_id)
     env_kwargs = env_data.env_kwargs
 
     config_kwargs = deepcopy(exp_utils.DEFAULT_PPO_CONFIG)

@@ -340,20 +340,8 @@ def main(args):
 
     all_exp_params = []
     for alg_name, full_env_id in itertools.product(args.alg_names, args.full_env_ids):
-        tokens = full_env_id.split("_")
-        if len(tokens) == 1:
-            env_id = full_env_id
-            agent_id = None
-        elif len(tokens) == 2:
-            env_id = tokens[0]
-            agent_id = tokens[1].replace("i", "")
-        else:
-            raise ValueError("Invalid full_env_id: {}".format(full_env_id))
-
-        env_data = exp_utils.get_env_data(env_id, agent_id)
-        exp_name = f"{alg_name}_{env_id}"
-        if agent_id is not None:
-            exp_name += f"_i{agent_id}"
+        env_data = exp_utils.get_env_data(full_env_id)
+        exp_name = f"{alg_name}_{full_env_id}"
         exp_name += f"_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
         exp_results_parent_dir = exp_utils.RESULTS_DIR / exp_name
