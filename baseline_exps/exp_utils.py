@@ -12,10 +12,10 @@ import posggym
 import psutil
 import yaml
 from posggym.agents.wrappers import AgentEnvWrapper
-
 from posggym_baselines.planning.config import MCTSConfig
 from posggym_baselines.planning.utils import BeliefStatTracker, PlanningStatTracker
 from posggym_baselines.utils.agent_env_wrapper import UniformOtherAgentFn
+
 
 BASELINE_EXP_DIR = Path(__file__).resolve().parent
 ENV_DATA_DIR = BASELINE_EXP_DIR / "env_data"
@@ -191,18 +191,10 @@ def get_env_data(full_env_id: str):
         env_kwargs = yaml.safe_load(f)
 
     # Population Data
-    agents_P0_file = env_data_path / (
-        "agents_P0.yaml" if agent_id is None else f"agents_P0_i{agent_id}.yaml"
-    )
-
-    with open(agents_P0_file, "r") as f:
+    with open(env_data_path / "agents_P0.yaml", "r") as f:
         agents_P0 = yaml.safe_load(f)
 
-    agents_P1_file = env_data_path / (
-        "agents_P1.yaml" if agent_id is None else f"agents_P1_i{agent_id}.yaml"
-    )
-
-    with open(agents_P1_file, "r") as f:
+    with open(env_data_path / "agents_P1.yaml", "r") as f:
         agents_P1 = yaml.safe_load(f)
 
     other_agent_id = next(iter(agents_P0.keys()))
@@ -234,19 +226,14 @@ def get_env_data(full_env_id: str):
             pop_policy_names[pop_id] = policy_names
             pop_co_team_names[pop_id] = policy_names
 
-    # RL Data
+    # RL-BR Data
     br_models_dir = env_data_path / "br_models"
     br_model_files = {"P0": {}, "P1": {}}
     for model_file_name in br_models_dir.glob("*.pt"):
         model_name = model_file_name.with_suffix("").name
         tokens = model_name.split("_")
         train_pop = tokens[0]
-        if agent_id is not None:
-            assert tokens[1].startswith("i")
-            assert tokens[1] == f"i{agent_id}"
-            seed = int(tokens[2].replace("seed", ""))
-        else:
-            seed = int(tokens[1].replace("seed", ""))
+        seed = int(tokens[1].replace("seed", ""))
         br_model_files[train_pop][seed] = br_models_dir / model_file_name
 
     # Planninn Data
