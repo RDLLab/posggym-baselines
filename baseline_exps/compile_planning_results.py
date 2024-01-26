@@ -114,6 +114,7 @@ def combine_all_experiment_results(
     summarize: bool = True,
     save_to_main: bool = False,
     combined: bool = False,
+    belief: bool = False,
 ) -> Dict[str, pd.DataFrame]:
     """Combine results from all experiments (alg, env) in `parent_dir`.
 
@@ -137,6 +138,8 @@ def combine_all_experiment_results(
         results so be careful.
     combined
         Whether results are for combined RL+Planning experiments.
+    belief
+        Whether results are for belief experiments.
 
     Returns
     -------
@@ -188,6 +191,8 @@ def combine_all_experiment_results(
     # save combined results
     if save_to_file:
         suffix = "_summary_results.csv" if summarize else "_results.csv"
+        if belief:
+            suffix = "_belief" + suffix
         suffix = "combined" + suffix if combined else "planning" + suffix
 
         for env_id in all_env_results:
@@ -236,6 +241,11 @@ if __name__ == "__main__":
         action="store_true",
         help="Whether results are for combined RL+Planning experiments.",
     )
+    parser.add_argument(
+        "--belief",
+        action="store_true",
+        help="Whether results are for belief experiments.",
+    )
     args = parser.parse_args()
 
     for parent_dir in args.exp_results_parent_dirs:
@@ -247,4 +257,5 @@ if __name__ == "__main__":
                 summarize=args.summarize,
                 save_to_main=args.save_to_main,
                 combined=args.combined,
+                belief=args.belief,
             )
