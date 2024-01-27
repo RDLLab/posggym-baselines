@@ -429,14 +429,7 @@ class CombinedExpParams(PlanningExpParams):
 
     def __post_init__(self):
         super().__post_init__()
-
-        policy_file_name = f"{self.rl_policy_pop_id}"
-        if self.full_env_id == "PursuitEvasion-v1_i0":
-            policy_file_name += "_i0"
-        elif self.full_env_id == "PursuitEvasion-v1_i1":
-            policy_file_name += "_i1"
-        policy_file_name += f"_seed{self.rl_policy_seed}.pt"
-
+        policy_file_name = f"{self.rl_policy_pop_id}_seed{self.rl_policy_seed}.pt"
         self.rl_policy_file = self.env_data_dir / "br_models" / policy_file_name
 
     def get_exp_results_file_name(self):
