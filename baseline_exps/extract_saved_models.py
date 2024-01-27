@@ -31,7 +31,7 @@ def main(args):
         seed = int(tokens[pop_idx + 1])
 
         # format: checkpoint_<update>_BR.pt
-        checkpoint_names = model_dir_path.glob("*BR.pt")
+        checkpoint_names = list(model_dir_path.glob("*_BR.pt"))
         assert len(checkpoint_names) >= 1
         checkpoint_path = max(checkpoint_names, key=lambda x: int(x.name.split("_")[1]))
 
