@@ -12,10 +12,10 @@ import posggym
 import psutil
 import yaml
 from posggym.agents.wrappers import AgentEnvWrapper
+
 from posggym_baselines.planning.config import MCTSConfig
 from posggym_baselines.planning.utils import BeliefStatTracker, PlanningStatTracker
 from posggym_baselines.utils.agent_env_wrapper import UniformOtherAgentFn
-
 
 BASELINE_EXP_DIR = Path(__file__).resolve().parent
 ENV_DATA_DIR = BASELINE_EXP_DIR / "env_data"
@@ -296,6 +296,7 @@ class PlanningExpParams:
     exp_time_limit: int
     # whether to track belief statistics (can slow down experiment time)
     belief_stats_to_track: List[str]
+    track_per_step_belief_stats: bool
 
     # experiment details for saving results
     exp_name: str
@@ -329,8 +330,16 @@ class PlanningExpParams:
             "time",
         ] + PlanningStatTracker.STAT_KEYS
 
-        for k in self.belief_stats_to_track:
-            self.episode_results_heads.append(f"belief_{k}_acc")
+        if self.track_per_step_belief_stats:
+            step_limit = posggym.spec(self.env_kwargs["env_id"]).max_episode_steps
+            belief_stat_keys = BeliefStatTracker.get_stat_keys(
+                self.belief_stats_to_track, track_per_step=True, step_limit=step_limit
+            )
+        else:
+            belief_stat_keys = BeliefStatTracker.get_stat_keys(
+                self.belief_stats_to_track, track_per_step=False, step_limit=None
+            )
+        self.episode_results_heads.extend(belief_stat_keys)
 
     def get_exp_results_file_name(self):
         file_name = f"{self.exp_num}_{self.planning_pop_id}_{self.test_pop_id}"
@@ -348,6 +357,7 @@ class PlanningExpParams:
             "num_episodes": self.num_episodes,
             "exp_time_limit": self.exp_time_limit,
             "belief_stats_to_track": self.belief_stats_to_track,
+            "track_per_step_belief_stats": self.track_per_step_belief_stats,
         }
 
     def setup_exp(self):
@@ -451,6 +461,7 @@ class CombinedExpParams(PlanningExpParams):
             "num_episodes": self.num_episodes,
             "exp_time_limit": self.exp_time_limit,
             "belief_stats_to_track": self.belief_stats_to_track,
+            "track_per_step_belief_stats": self.track_per_step_belief_stats,
         }
 
 
@@ -477,7 +488,7 @@ def run_planning_exp(exp_params: PlanningExpParams):
     belief_tracker = BeliefStatTracker(
         planner,
         env,
-        track_overall=False,
+        track_per_step=exp_params.track_per_step_belief_stats,
         stats_to_track=exp_params.belief_stats_to_track,
     )
 
@@ -520,9 +531,7 @@ def run_planning_exp(exp_params: PlanningExpParams):
 
         episode_results["time"] = time.time() - episode_start_time
         episode_results.update(planner.stat_tracker.get_episode())
-        episode_results.update(
-            {f"belief_{k}_acc": v for k, v in belief_tracker.get_episode().items()}
-        )
+        episode_results.update(belief_tracker.get_episode())
         exp_params.write_episode_results(episode_results)
         episode_num += 1
 

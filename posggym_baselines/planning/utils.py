@@ -170,7 +170,7 @@ class BeliefStatTracker:
         self,
         planner,
         env: AgentEnvWrapper,
-        track_overall: bool = True,
+        track_per_step: bool = False,
         stats_to_track: List[str] = ["policy", "action", "state", "history"],
     ):
         assert all(k in self.TRACKABLE_BELIEF_STATS for k in stats_to_track)
@@ -180,9 +180,16 @@ class BeliefStatTracker:
                 for pi in planner.other_agent_policies.values()
             )
 
+        if track_per_step:
+            assert env.spec is not None
+            assert env.spec.max_episode_steps is not None
+            self.step_limit = env.spec.max_episode_steps
+        else:
+            self.step_limit = None
+
         self.planner = planner
         self.env = env
-        self.track_overall = track_overall
+        self.track_per_step = track_per_step
         self.stats_to_track = stats_to_track
         self.other_agent_ids = [
             i for i in planner.model.possible_agents if i != planner.agent_id
@@ -193,15 +200,24 @@ class BeliefStatTracker:
         self._current_other_agent_histories = {
             i: AgentHistory.get_init_history() for i in self.other_agent_ids
         }
-        self._current_stats: Dict[str, List[float]] = {
-            k: [] for k in self.stats_to_track
-        }
-
         self._num_episodes = 0
-        self._all_steps: List[int] = []
-        self._all_stats: Dict[str, List[float]] = {k: [] for k in self.stats_to_track}
-
+        self._current_stats = {k: [] for k in self.stats_to_track}
         self.reset()
+
+    @classmethod
+    def get_stat_keys(
+        cls, stats_to_track: List[str], track_per_step: bool, step_limit: Optional[int]
+    ) -> List[str]:
+        """Get list of stat keys."""
+        assert all(k in cls.TRACKABLE_BELIEF_STATS for k in stats_to_track)
+        keys = []
+        for k in stats_to_track:
+            keys.append(f"belief_{k}_acc")
+            if track_per_step:
+                assert step_limit is not None
+                for t in range(step_limit):
+                    keys.append(f"belief_{k}_acc_{t}")
+        return keys
 
     def step(self, env: AgentEnvWrapper):
         self._current_steps += 1
@@ -232,13 +248,10 @@ class BeliefStatTracker:
         """Reset tracker."""
         self.reset_episode()
         self._num_episodes = 0
-        self._all_steps = []
-        self._all_stats = {k: [] for k in self.stats_to_track}
 
     def reset_episode(self):
         """Reset for new episode.
 
-        Takes care of summarizing results from any previous episode.
         This should be called at the beginning of each episode, or after finishing
         final episode.
         """
@@ -254,11 +267,6 @@ class BeliefStatTracker:
             return
 
         self._num_episodes += 1
-        if self.track_overall:
-            self._all_steps.append(self._current_steps)
-            for k, v in self._current_stats:
-                self._all_stats[k].append(np.nanmean(v))
-
         self._current_steps = 0
         self._current_stats = {k: [] for k in self.stats_to_track}
 
@@ -270,21 +278,12 @@ class BeliefStatTracker:
                 v_mean = np.nan
             else:
                 v_mean = np.nanmean(v, axis=0)
-            stats[k] = v_mean
-        return stats
+            stats[f"belief_{k}_acc"] = v_mean
 
-    def get(self) -> Dict[str, float]:
-        """Get statistics for all episodes."""
-        stats = {}
-        for k, v in self._all_stats.items():
-            if len(v) == 0 or np.isnan(np.sum(v)):
-                mean_val = np.nan
-                std_val = np.nan
-            else:
-                mean_val = np.nanmean(v, axis=0)
-                std_val = np.nanstd(v, axis=0)
-            stats[f"{k}_mean"] = mean_val
-            stats[f"{k}_std"] = std_val
+            if self.track_per_step:
+                for t in range(self.step_limit):
+                    v_t = np.nan if t >= len(v) else v[t]
+                    stats[f"belief_{k}_acc_{t}"] = v_t
         return stats
 
     def get_state_accuracy(self, state: M.StateType) -> float:

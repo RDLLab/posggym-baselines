@@ -88,7 +88,7 @@ def compile_sub_experiment_results(
             exp_args = yaml.safe_load(f)
 
         for k, v in exp_args.items():
-            if k == "belief_stats_to_track":
+            if k in ("belief_stats_to_track", "track_per_step_belief_stats"):
                 continue
             elif k == "num_episodes":
                 k = "num_episodes_limit"
@@ -115,6 +115,7 @@ def combine_all_experiment_results(
     save_to_main: bool = False,
     combined: bool = False,
     belief: bool = False,
+    per_step_belief: bool = False,
 ) -> Dict[str, pd.DataFrame]:
     """Combine results from all experiments (alg, env) in `parent_dir`.
 
@@ -140,6 +141,8 @@ def combine_all_experiment_results(
         Whether results are for combined RL+Planning experiments.
     belief
         Whether results are for belief experiments.
+    per_step_belief
+        Whether results are for per step belief experiments.
 
     Returns
     -------
@@ -191,7 +194,9 @@ def combine_all_experiment_results(
     # save combined results
     if save_to_file:
         suffix = "_summary_results.csv" if summarize else "_results.csv"
-        if belief:
+        if per_step_belief:
+            suffix = "_belief_per_step" + suffix
+        elif belief:
             suffix = "_belief" + suffix
         suffix = "combined" + suffix if combined else "planning" + suffix
 
@@ -246,6 +251,11 @@ if __name__ == "__main__":
         action="store_true",
         help="Whether results are for belief experiments.",
     )
+    parser.add_argument(
+        "--per_step_belief",
+        action="store_true",
+        help="Whether results are for per step belief experiments.",
+    )
     args = parser.parse_args()
 
     for parent_dir in args.exp_results_parent_dirs:
@@ -258,4 +268,5 @@ if __name__ == "__main__":
                 save_to_main=args.save_to_main,
                 combined=args.combined,
                 belief=args.belief,
+                per_step_belief=args.per_step_belief,
             )

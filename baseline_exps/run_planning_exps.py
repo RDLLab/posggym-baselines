@@ -55,7 +55,6 @@ import exp_utils
 import posggym
 import torch
 from exp_utils import PlanningExpParams
-
 from posggym_baselines.planning.config import MCTSConfig
 from posggym_baselines.planning.intmcp import INTMCP
 from posggym_baselines.planning.ipomcp import IPOMCP
@@ -64,6 +63,7 @@ from posggym_baselines.planning.pomcp import POMCP
 from posggym_baselines.planning.potmmcp import POTMMCP, POTMMCPMetaPolicy
 from posggym_baselines.planning.search_policy import RandomSearchPolicy
 from posggym_baselines.utils import strtobool
+
 
 # same as in I-POMCP paper experiments
 # also best performing value in I-NTMCP paper
@@ -120,6 +120,7 @@ def get_intmcp_exp_params(
             test_pop_id=test_pop_id,
             full_env_id=env_data.full_env_id,
             belief_stats_to_track=[*belief_stats_to_track],
+            track_per_step_belief_stats=args.track_per_step_belief_stats,
         )
         all_exp_params.append(exp_params)
         exp_num += 1
@@ -185,6 +186,7 @@ def get_ipomcp_exp_params(
             test_pop_id=test_pop_id,
             full_env_id=env_data.full_env_id,
             belief_stats_to_track=[*belief_stats_to_track],
+            track_per_step_belief_stats=args.track_per_step_belief_stats,
         )
         all_exp_params.append(exp_params)
         exp_num += 1
@@ -237,6 +239,7 @@ def get_pomcp_exp_params(
             test_pop_id=test_pop_id,
             full_env_id=env_data.full_env_id,
             belief_stats_to_track=[*belief_stats_to_track],
+            track_per_step_belief_stats=args.track_per_step_belief_stats,
         )
         all_exp_params.append(exp_params)
         exp_num += 1
@@ -306,6 +309,7 @@ def get_potmmcp_exp_params(
             test_pop_id=test_pop_id,
             full_env_id=env_data.full_env_id,
             belief_stats_to_track=[*belief_stats_to_track],
+            track_per_step_belief_stats=args.track_per_step_belief_stats,
         )
         all_exp_params.append(exp_params)
         exp_num += 1
@@ -439,6 +443,15 @@ if __name__ == "__main__":
         type=strtobool,
         default=False,
         help="Whether to track belief accuracy statistics.",
+    )
+    parser.add_argument(
+        "--track_per_step_belief_stats",
+        type=strtobool,
+        default=False,
+        help=(
+            "Whether to track per step belief accuracy statistics (in addition to per "
+            "episode mean). Only applicable when `track_belief_stats` is True."
+        ),
     )
     parser.add_argument(
         "--n_cpus",
