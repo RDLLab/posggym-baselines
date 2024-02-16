@@ -57,6 +57,14 @@ def run_rollout_worker(
     buf_shape = (config.num_rollout_steps, config.num_envs, config.num_agents)
     policy_idx_buf = torch.zeros(buf_shape).long().to(device)
     obs_buf = torch.zeros(buf_shape + config.obs_space.shape).to(device)
+    print(
+        "buf_shape: ",
+        buf_shape,
+        "config.act_space.shape: ",
+        config.act_space.shape,
+        "buf_shape + config.act_space.shape: ",
+        buf_shape + config.act_space.shape,
+    )
     actions_buf = torch.zeros(buf_shape + config.act_space.shape).to(device)
     logprobs_buf = torch.zeros(buf_shape).to(device)
     rewards_buf = torch.zeros(buf_shape).to(device)
@@ -162,8 +170,12 @@ def run_rollout_worker(
                 if lstm_i is not None:
                     next_lstm_state[0][:, idxs, :] = lstm_i[0]
                     next_lstm_state[1][:, idxs, :] = lstm_i[1]
-
+                print("actions_i.shape: ", actions_i.shape)
+                print("next_action.shape: ", next_action.shape)
                 next_action[idxs] = actions_i
+            print("next_action.shape: ", next_action.shape)
+            print("actions_buf.shape: ", actions_buf.shape)
+            print("actions_buf[step].shape: ", actions_buf[step].shape)
 
             actions_buf[step] = next_action
             logprobs_buf[step] = next_logprobs

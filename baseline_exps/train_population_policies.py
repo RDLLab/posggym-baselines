@@ -22,14 +22,14 @@ from typing import Callable, Optional
 
 import exp_utils
 import posggym
-from posggym.wrappers import FlattenObservations, RecordVideo
+from posggym.wrappers import FlattenObservations, RecordVideo, DiscretizeActions
 
 from posggym_baselines.ppo.config import PPOConfig
 from posggym_baselines.ppo.core import run_ppo
 from posggym_baselines.ppo.ippo import IPPOConfig
 from posggym_baselines.ppo.klr_ppo import KLRPPOConfig
 from posggym_baselines.utils import strtobool
-
+from gymnasium import spaces
 
 def get_env_creator_fn(
     config: PPOConfig, env_idx: int, worker_idx: Optional[int] = None
@@ -43,6 +43,10 @@ def get_env_creator_fn(
         if capture_video:
             env = RecordVideo(env, config.video_dir)
         env = FlattenObservations(env)
+        
+        if isinstance(env.action_spaces["0"], spaces.Box):
+            env = DiscretizeActions(env, 4, False)                       
+        
 
         seed = config.seed + env_idx
         if worker_idx is not None:
@@ -123,6 +127,7 @@ if __name__ == "__main__":
         choices=[
             "CooperativeReaching-v0",
             "Driving-v1",
+            "DrivingContinuous-v0",
             "LevelBasedForaging-v3",
             "PredatorPrey-v0",
             "PursuitEvasion-v1_i0",

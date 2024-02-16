@@ -12,6 +12,7 @@ import torch
 
 from posggym_baselines.ppo.config import PPOConfig
 from posggym_baselines.ppo.network import PPOLSTMModel, PPOMLPModel, PPOModel
+from gymnasium import spaces
 
 
 @dataclass
@@ -33,11 +34,16 @@ class IPPOConfig(PPOConfig):
         self.num_agents = len(env.possible_agents)
 
     def load_policies(self, device: Optional[torch.device]) -> Dict[str, PPOModel]:
+        num_actions = (
+            self.act_space.n
+            if isinstance(self.act_space, spaces.Discrete)
+            else self.act_space.nvec.tolist()
+        )
         if self.use_lstm:
             model_cls = PPOLSTMModel
             model_kwargs = {
                 "input_size": np.prod(self.obs_space.shape),
-                "num_actions": self.act_space.n,
+                "num_actions": num_actions,
                 "trunk_sizes": self.trunk_sizes,
                 "lstm_size": self.lstm_size,
                 "lstm_layers": self.lstm_num_layers,
@@ -47,7 +53,7 @@ class IPPOConfig(PPOConfig):
             model_cls = PPOMLPModel
             model_kwargs = {
                 "input_size": np.prod(self.obs_space.shape),
-                "num_actions": self.act_space.n,
+                "num_actions": num_actions,
                 "trunk_sizes": self.trunk_sizes,
                 "head_sizes": self.head_sizes,
             }

@@ -156,7 +156,7 @@ class PPOLSTMModel(PPOModel):
     def __init__(
         self,
         input_size: int,
-        num_actions: int,
+        num_actions: int | List[int],
         trunk_sizes: List[int],
         lstm_size: int,
         lstm_layers: int,
@@ -201,7 +201,11 @@ class PPOLSTMModel(PPOModel):
             ]
             prev_size = size
 
-        actor.append(layer_init(nn.Linear(prev_size, num_actions), std=0.01))
+        if isinstance(num_actions, list):
+            actor.append(layer_init(nn.Linear(prev_size, sum(num_actions)), std=0.01))
+        else:
+            actor.append(layer_init(nn.Linear(prev_size, num_actions), std=0.01))
+
         self.actor = nn.Sequential(*actor)
 
         critic.append(
@@ -318,13 +322,16 @@ class PPOLSTMModel(PPOModel):
         assert lstm_state is not None
         hidden, lstm_state = self.get_states(x, lstm_state, done)
         logits = self.actor(hidden)
+        if isinstance(self.num_actions, list):
+            logits = logits.view(64, 2, 4).transpose(1, 0)
         probs = Categorical(logits=logits)
         if action is None:
             action = probs.sample()
+
         return (
-            action,
-            probs.log_prob(action),
-            probs.entropy(),
+            action.T,
+            probs.log_prob(action).T,
+            probs.entropy().T,
             self.critic(hidden),
             lstm_state,
         )
