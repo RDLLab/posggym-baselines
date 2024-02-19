@@ -94,7 +94,11 @@ def run_rollout_worker(
         torch.zeros(lstm_state_shape).to(config.worker_device),
         torch.zeros(lstm_state_shape).to(config.worker_device),
     )
-    next_action = torch.zeros(next_vars_shape).long().to(config.worker_device)
+    next_action = (
+        torch.zeros((*next_vars_shape, envs.action_spaces["0"].shape[1]))
+        .long()
+        .to(config.worker_device)
+    )
     next_logprobs = torch.zeros(next_vars_shape).to(config.worker_device)
     next_values = torch.zeros(next_vars_shape).to(config.worker_device)
 
@@ -183,7 +187,7 @@ def run_rollout_worker(
 
             # execute step.
             next_obs, reward, terminated, truncated, dones, infos = envs.step(
-                next_action.reshape(-1).cpu().numpy()
+                next_action.cpu().numpy()
             )
             agent_dones = terminated | truncated
 

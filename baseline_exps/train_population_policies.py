@@ -31,6 +31,7 @@ from posggym_baselines.ppo.klr_ppo import KLRPPOConfig
 from posggym_baselines.utils import strtobool
 from gymnasium import spaces
 
+
 def get_env_creator_fn(
     config: PPOConfig, env_idx: int, worker_idx: Optional[int] = None
 ) -> Callable:
@@ -43,10 +44,9 @@ def get_env_creator_fn(
         if capture_video:
             env = RecordVideo(env, config.video_dir)
         env = FlattenObservations(env)
-        
+
         if isinstance(env.action_spaces["0"], spaces.Box):
-            env = DiscretizeActions(env, 4, False)                       
-        
+            env = DiscretizeActions(env, 4, False)
 
         seed = config.seed + env_idx
         if worker_idx is not None:

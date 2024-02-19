@@ -62,7 +62,7 @@ class PPOConfig:
     # Whether to log to wandb or not
     track_wandb: bool = False
     # wandb project name
-    wandb_project: str = "posggym_baselines"
+    wandb_project: str = "posggym_dynamics"
     # wandb entity name
     wandb_entity: str = None
     # wandb group name
@@ -102,7 +102,7 @@ class PPOConfig:
     # observation space of the environment
     obs_space: gym.spaces.Box = field(init=False)
     # action space of the environment
-    act_space: gym.spaces.Discrete = field(init=False)
+    act_space: gym.spaces.Discrete | gym.spaces.MultiDiscrete = field(init=False)
     # number of agents in the environment
     num_agents: int = field(init=False)
 

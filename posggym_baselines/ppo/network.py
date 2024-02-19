@@ -323,15 +323,19 @@ class PPOLSTMModel(PPOModel):
         hidden, lstm_state = self.get_states(x, lstm_state, done)
         logits = self.actor(hidden)
         if isinstance(self.num_actions, list):
-            logits = logits.view(64, 2, 4).transpose(1, 0)
+            # We split this in to batches for running through categorical
+            # One batch for each agent
+            logits = logits.view(
+                logits.shape[0], len(self.num_actions), self.num_actions[0]
+            ).transpose(1, 0)
+
         probs = Categorical(logits=logits)
-        if action is None:
-            action = probs.sample()
+        action = probs.sample() if action is None else action.T
 
         return (
             action.T,
-            probs.log_prob(action).T,
-            probs.entropy().T,
+            probs.log_prob(action).T.sum(1),
+            probs.entropy().T.sum(1),
             self.critic(hidden),
             lstm_state,
         )
