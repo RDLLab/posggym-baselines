@@ -175,6 +175,12 @@ class PPOLearner:
                 # display progress in stdout
                 training_time = timedelta(seconds=int(time.time() - train_start_time))
                 output = [f"learner: time={training_time} global_step={global_step}"]
+
+                updates_left = self.config.num_updates - update
+                avg_time_per_update = training_time / update
+                time_left_seconds = avg_time_per_update * updates_left
+                output += [f"remaining: time={time_left_seconds}"]
+
                 output += [
                     f"  {policy_id}: {policy_return:.2f}"
                     for policy_id, policy_return in policy_returns.items()

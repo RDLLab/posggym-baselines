@@ -16,6 +16,7 @@ from posggym.agents.wrappers import AgentEnvWrapper
 from posggym_baselines.planning.config import MCTSConfig
 from posggym_baselines.planning.utils import PlanningStatTracker
 from posggym_baselines.utils.agent_env_wrapper import UniformOtherAgentFn
+from posggym_baselines.config import BASE_RESULTS_DIR
 
 BASELINE_EXP_DIR = Path(__file__).resolve().parent
 ENV_DATA_DIR = BASELINE_EXP_DIR / "env_data"
@@ -101,6 +102,7 @@ DEFAULT_PPO_CONFIG = {
     "lstm_num_layers": 1,
     "trunk_sizes": [64, 64],
     "head_sizes": [64],
+    "log_dir": BASE_RESULTS_DIR,
 }
 
 

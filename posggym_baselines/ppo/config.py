@@ -68,7 +68,7 @@ class PPOConfig:
     # wandb group name
     wandb_group: str = None
     # Directory where the model and logs will be saved
-    log_dir: Path = field(init=False)
+    log_dir: Path = None
     # Directory where videos will be saved
     video_dir: Path = field(init=False)
     # Directory where models will be saved
@@ -172,7 +172,9 @@ class PPOConfig:
             self.run_name += f"_{self.env_id}"
         self.run_name += f"_{self.seed}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
-        self.log_dir = BASE_RESULTS_DIR / self.run_name
+        self.log_dir = (
+            self.log_dir if self.log_dir is not None else BASE_RESULTS_DIR
+        ) / self.run_name
         self.video_dir = self.log_dir / "videos"
         self.model_dir = self.log_dir / "models"
 

@@ -99,7 +99,7 @@ class TensorBoardLogger(Logger):
                     wandb.log(  # type:ignore
                         {
                             "video": wandb.Video(  # type:ignore
-                                filename
+                                str(filename.absolute())
                             )
                         },
                     )

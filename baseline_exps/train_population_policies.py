@@ -16,7 +16,6 @@ set `--track_wandb=False`. To disable all logging (i.e. for debugging), set
 Use `--help` to see all available options.
 
 """
-import argparse
 from copy import deepcopy
 from typing import Callable, Optional
 
@@ -28,8 +27,30 @@ from posggym_baselines.ppo.config import PPOConfig
 from posggym_baselines.ppo.core import run_ppo
 from posggym_baselines.ppo.ippo import IPPOConfig
 from posggym_baselines.ppo.klr_ppo import KLRPPOConfig
-from posggym_baselines.utils import strtobool
 from gymnasium import spaces
+from typing_extensions import Annotated
+import typer
+from enum import Enum
+from pathlib import Path
+
+app = typer.Typer()
+
+
+class TrainableEnvs(str, Enum):
+    CooperativeReaching = "CooperativeReaching-v0"
+    Driving = "Driving-v1"
+    DrivingContinuous = "DrivingContinuous-v0"
+    LevelBasedForaging = "LevelBasedForaging-v3"
+    PredatorPrey = "PredatorPrey-v0"
+    PursuitEvasion_i0 = "PursuitEvasion-v1_i0"
+    PursuitEvasion_i1 = "PursuitEvasion-v1_i1"
+
+
+class Algs(str, Enum):
+    SP = "SP"
+    SP_BR = "SP-BR"
+    KLR = "KLR"
+    KLR_BR = "KLR-BR"
 
 
 def get_env_creator_fn(
@@ -58,32 +79,59 @@ def get_env_creator_fn(
     return thunk
 
 
-def train(args):
+@app.command()
+def train(
+    pop_training_alg: Annotated[Algs, typer.Option(case_sensitive=False)],
+    full_env_id: Annotated[TrainableEnvs, typer.Option()],
+    pop_size: Annotated[
+        int,
+        typer.Option(
+            help="Number of independent policies in the population."
+            "For `klr` and `klr-br`, this is the max reasoning"
+            "level `K`, e.g `pop_size=4` means `K=3` for  `klr` and"
+            " `k=2` for `klr-br`."
+        ),
+    ] = 4,
+    track_wandb: Annotated[bool, typer.Option()] = True,
+    disable_logging: Annotated[bool, typer.Option()] = False,
+    capture_video: Annotated[bool, typer.Option()] = False,
+    cuda: Annotated[bool, typer.Option()] = True,
+    seed: Annotated[int, typer.Option()] = 0,
+    total_timesteps: Annotated[int, typer.Option()] = int(3.2e6),
+    num_workers: Annotated[int, typer.Option()] = 2,
+    use_lstm: Annotated[bool, typer.Option()] = True,
+    log_dir: Annotated[Path, typer.Option()] = Path("."),
+):
+    d = deepcopy(locals())
+
     """Run training for KLR and KLR plus BR."""
-    env_data = exp_utils.get_env_data(None, None, full_env_id=args.full_env_id)
+    env_data = exp_utils.get_env_data(None, None, full_env_id=full_env_id.value)
     env_kwargs = env_data.env_kwargs
 
     config_kwargs = deepcopy(exp_utils.DEFAULT_PPO_CONFIG)
     config_kwargs.update(
         {
-            "exp_name": f"{args.pop_training_alg}_{args.full_env_id}_N{args.pop_size}",
+            "exp_name": f"{pop_training_alg.value}_{full_env_id.value}_N{pop_size}",
             "env_creator_fn": get_env_creator_fn,
             "env_id": env_kwargs["env_id"],
             "env_kwargs": env_kwargs["env_kwargs"],
         }
     )
 
-    for k, v in vars(args).items():
+    for k, v in d.items():
         if k in config_kwargs:
-            config_kwargs[k] = v
+            if isinstance(v, Enum):
+                config_kwargs[k] = v.value
+            else:
+                config_kwargs[k] = v
 
-    if args.pop_training_alg.startswith("KLR"):
-        if args.pop_training_alg == "KLR-BR":
+    if pop_training_alg.value.startswith("KLR"):
+        if pop_training_alg == Algs.KLR_BR:
             include_BR = True
-            max_reasoning_level = args.pop_size - 2
+            max_reasoning_level = pop_size - 2
         else:
             include_BR = False
-            max_reasoning_level = args.pop_size - 1
+            max_reasoning_level = pop_size - 1
 
         config = KLRPPOConfig(
             max_reasoning_level=max_reasoning_level,
@@ -92,12 +140,12 @@ def train(args):
             **config_kwargs,
         )
     else:
-        if args.pop_training_alg == "SP-BR":
+        if pop_training_alg == Algs.SP_BR:
             include_BR = True
-            pop_size = args.pop_size - 1
+            pop_size = pop_size - 1
         else:
             include_BR = False
-            pop_size = args.pop_size
+            pop_size = pop_size
 
         config = IPPOConfig(
             pop_size=pop_size,
@@ -111,86 +159,4 @@ def train(args):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
-    )
-    parser.add_argument(
-        "pop_training_alg",
-        type=str,
-        choices=["SP", "SP-BR", "KLR", "KLR-BR"],
-        help="The population training algorithm to run.",
-    )
-    parser.add_argument(
-        "--full_env_id",
-        type=str,
-        required=True,
-        choices=[
-            "CooperativeReaching-v0",
-            "Driving-v1",
-            "DrivingContinuous-v0",
-            "LevelBasedForaging-v3",
-            "PredatorPrey-v0",
-            "PursuitEvasion-v1_i0",
-            "PursuitEvasion-v1_i1",
-        ],
-        help="Name of environment to train on.",
-    )
-    parser.add_argument(
-        "--pop_size",
-        type=int,
-        default=4,
-        help=(
-            "Number of independent policies in the population. For `klr` and `klr-br`, "
-            " this is the max reasoning level `K`, e.g `pop_size=4` means `K=3` for "
-            "`klr` and `k=2` for `klr-br`."
-        ),
-    )
-    parser.add_argument(
-        "--track_wandb",
-        type=strtobool,
-        default=True,
-        help="Whether to track the experiment with wandb.",
-    )
-    parser.add_argument(
-        "--disable_logging",
-        type=strtobool,
-        default=False,
-        help="Whether to disable all logging (for debugging).",
-    )
-    parser.add_argument(
-        "--capture_video",
-        type=strtobool,
-        default=False,
-        help="Whether to capture videos of the environment during training.",
-    )
-    parser.add_argument(
-        "--cuda",
-        type=strtobool,
-        default=True,
-        help="Whether to use CUDA for learner if available.",
-    )
-    parser.add_argument(
-        "--seed",
-        type=int,
-        default=0,
-        help="Random seed.",
-    )
-    parser.add_argument(
-        "--total_timesteps",
-        type=int,
-        default=int(3.2e6),
-        help="Total number of training timesteps.",
-    )
-    parser.add_argument(
-        "--num_workers",
-        type=int,
-        default=2,
-        help="Number of worker processes.",
-    )
-    parser.add_argument(
-        "--use_lstm",
-        type=strtobool,
-        default=True,
-        help="Whether to use LSTM based policy network for learner.",
-    )
-    train(parser.parse_args())
+    app()

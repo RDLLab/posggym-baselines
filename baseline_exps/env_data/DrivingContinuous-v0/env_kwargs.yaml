@@ -1,5 +1,8 @@
 env_id: "DrivingContinuous-v0"
 env_kwargs:
-  world: "14x14RoundAbout"
+  world: "14x14Empty"
   num_agents: 2
   should_randomze_dyn: True
+  control_type: "ForceNonHolonomoic"
+  obs_dist: 20
+  n_sensors: 48
