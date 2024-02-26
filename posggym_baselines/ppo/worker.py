@@ -7,6 +7,15 @@ import torch.multiprocessing as mp
 
 import posggym_baselines.ppo.utils as ppo_utils
 from posggym_baselines.ppo.config import PPOConfig
+import numpy as np
+
+
+def one_hot(x, space):
+    # assert isinstance(space, MultiDiscrete)
+    return torch.cat(
+        [torch.nn.functional.one_hot(x[:, i], n) for i, n in enumerate(space.nvec)],
+        dim=-1,
+    )
 
 
 def run_rollout_worker(
@@ -56,7 +65,12 @@ def run_rollout_worker(
     # worker buffers
     buf_shape = (config.num_rollout_steps, config.num_envs, config.num_agents)
     policy_idx_buf = torch.zeros(buf_shape).long().to(device)
-    obs_buf = torch.zeros(buf_shape + config.obs_space.shape).to(device)
+    obs_buf_shape = buf_shape + config.obs_space.shape
+    if config.use_previous_action:
+        obs_buf_shape = obs_buf_shape[:-1] + (
+            obs_buf_shape[-1] + envs.env.unwrapped.single_action_spaces["0"].nvec.sum(),
+        )
+    obs_buf = torch.zeros(obs_buf_shape).to(device)
     actions_buf = torch.zeros(buf_shape + config.act_space.shape).to(device)
     logprobs_buf = torch.zeros(buf_shape).to(device)
     rewards_buf = torch.zeros(buf_shape).to(device)
@@ -91,6 +105,24 @@ def run_rollout_worker(
         .long()
         .to(config.worker_device)
     )
+    if config.use_previous_action:
+        initial_actions = (
+            torch.zeros(
+                (
+                    config.num_envs,
+                    config.num_agents,
+                    envs.env.unwrapped.single_action_spaces["0"].nvec.sum(),
+                )
+            )
+            .long()
+            .to(config.worker_device)
+        )
+        initial_actions = initial_actions.reshape(
+            *next_obs.shape[:-1],
+            envs.env.unwrapped.single_action_spaces["0"].nvec.sum(),
+        )
+        next_obs = torch.cat((next_obs, initial_actions), dim=-1)
+
     next_logprobs = torch.zeros(next_vars_shape).to(config.worker_device)
     next_values = torch.zeros(next_vars_shape).to(config.worker_device)
 
@@ -176,6 +208,18 @@ def run_rollout_worker(
             next_obs, reward, terminated, truncated, dones, infos = envs.step(
                 next_action.cpu().numpy()
             )
+            if config.use_previous_action:
+                next_obs = np.concatenate(
+                    (
+                        next_obs,
+                        one_hot(
+                            next_action.flatten(start_dim=0, end_dim=1),
+                            envs.env.unwrapped.single_action_spaces["0"],
+                        ).numpy(),
+                    ),
+                    axis=-1,
+                )
+
             agent_dones = terminated | truncated
 
             rewards_buf[step] = (

@@ -12,6 +12,7 @@ import torch
 import torch.multiprocessing as mp
 import torch.nn as nn
 import torch.optim as optim
+from gymnasium import spaces
 
 import posggym_baselines.ppo.utils as ppo_utils
 from posggym_baselines.ppo.eval import run_eval_worker
@@ -264,6 +265,11 @@ class PPOLearner:
                 policy_batches, self.config
             )
 
+        one_hot_size = (
+            self.config.act_space.n
+            if isinstance(self.config.act_space, spaces.Discrete)
+            else self.config.act_space.nvec.sum()
+        )
         # update each policy
         for policy_id in self.config.train_policies:
             if policy_id not in policy_batches or len(policy_batches[policy_id]) == 0:
@@ -277,7 +283,13 @@ class PPOLearner:
             # flatten the batch
             b_obs = (
                 policy_batch["obs"]
-                .reshape((-1,) + self.config.obs_space.shape)
+                .reshape(
+                    (-1,)
+                    + (
+                        self.config.obs_space.shape[0]
+                        + (one_hot_size if self.config.use_previous_action else 0),
+                    )
+                )
                 .to(self.config.device)
             )
             b_logprobs = policy_batch["logprobs"].reshape(-1).to(self.config.device)
@@ -592,6 +604,14 @@ def run_learner(
         eval_recv_queue.join()
 
     print("learner: All done")
+
+
+def one_hot(x, space):
+    # assert isinstance(space, MultiDiscrete)
+    return torch.cat(
+        [torch.nn.functional.one_hot(x[:, i], n) for i, n in enumerate(space.nvec)],
+        dim=-1,
+    )
 
 
 def run_ppo(config: "PPOConfig"):

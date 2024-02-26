@@ -79,7 +79,9 @@ def get_env_creator_fn(
     return thunk
 
 
-@app.command()
+@app.command(
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True}
+)
 def train(
     pop_training_alg: Annotated[Algs, typer.Option(case_sensitive=False)],
     full_env_id: Annotated[TrainableEnvs, typer.Option()],
@@ -108,6 +110,15 @@ def train(
     env_data = exp_utils.get_env_data(None, None, full_env_id=full_env_id.value)
     env_kwargs = env_data.env_kwargs
 
+    env_data_path = exp_utils.ENV_DATA_DIR / full_env_id.value
+    if env_data_path / "PPOConfig.yaml":
+        import yaml
+
+        with open(env_data_path / "PPOConfig.yaml", "r") as file:
+            loaded_config = yaml.safe_load(file)
+    else:
+        loaded_config = {}
+
     config_kwargs = deepcopy(exp_utils.DEFAULT_PPO_CONFIG)
     config_kwargs.update(
         {
@@ -124,6 +135,8 @@ def train(
                 config_kwargs[k] = v.value
             else:
                 config_kwargs[k] = v
+
+    config_kwargs = {**config_kwargs, **loaded_config}
 
     if pop_training_alg.value.startswith("KLR"):
         if pop_training_alg == Algs.KLR_BR:

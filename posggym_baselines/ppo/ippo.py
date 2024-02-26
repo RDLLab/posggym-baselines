@@ -39,10 +39,17 @@ class IPPOConfig(PPOConfig):
             if isinstance(self.act_space, spaces.Discrete)
             else self.act_space.nvec.tolist()
         )
+        one_hot_size = (
+            self.act_space.n
+            if isinstance(self.act_space, spaces.Discrete)
+            else self.act_space.nvec.sum()
+        )
         if self.use_lstm:
             model_cls = PPOLSTMModel
             model_kwargs = {
-                "input_size": np.prod(self.obs_space.shape),
+                "input_size": np.prod(self.obs_space.shape) + one_hot_size
+                if self.use_previous_action
+                else 0,
                 "num_actions": num_actions,
                 "trunk_sizes": self.trunk_sizes,
                 "lstm_size": self.lstm_size,

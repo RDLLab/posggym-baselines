@@ -79,7 +79,7 @@ class PPOConfig:
     # if 0, never save
     # if > 0, save every save_interval updates
     # if -1, save only at the end of training
-    save_interval: int = -1
+    save_interval: int = 100
 
     # number of updates between evaluations against heldout policies, if applicable
     # if 0 = no evaluation is performed,
@@ -164,6 +164,8 @@ class PPOConfig:
     trunk_sizes: List[int] = field(default_factory=lambda: [64])
     # size of network heads
     head_sizes: List[int] = field(default_factory=lambda: [64])
+    # Include Previous Action
+    use_previous_action = True
 
     def __post_init__(self):
         """Post initialization."""
