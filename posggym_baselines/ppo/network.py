@@ -161,12 +161,14 @@ class PPOLSTMModel(PPOModel):
         lstm_size: int,
         lstm_layers: int,
         head_sizes: List[int],
+        use_residual_lstm: bool,
     ):
         super().__init__()
         self.input_size = input_size
         self.num_actions = num_actions
         self.lstm_size = lstm_size
         self.lstm_layers = lstm_layers
+        self.use_residual_lstm = use_residual_lstm
 
         prev_size = input_size
         trunk = []
@@ -269,6 +271,8 @@ class PPOLSTMModel(PPOModel):
             new_hidden += [h]
 
         new_hidden = torch.flatten(torch.cat(new_hidden), 0, 1)
+        if self.use_residual_lstm:
+            new_hidden += hidden.reshape(new_hidden.shape)
         return new_hidden, lstm_state
 
     def get_value(

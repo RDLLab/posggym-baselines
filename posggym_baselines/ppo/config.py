@@ -166,6 +166,8 @@ class PPOConfig:
     head_sizes: List[int] = field(default_factory=lambda: [64])
     # Include Previous Action
     use_previous_action = True
+    # Is the LSTM only doing a residual term...
+    use_residual_lstm = True
 
     def __post_init__(self):
         """Post initialization."""

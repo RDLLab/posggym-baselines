@@ -606,14 +606,6 @@ def run_learner(
     print("learner: All done")
 
 
-def one_hot(x, space):
-    # assert isinstance(space, MultiDiscrete)
-    return torch.cat(
-        [torch.nn.functional.one_hot(x[:, i], n) for i, n in enumerate(space.nvec)],
-        dim=-1,
-    )
-
-
 def run_ppo(config: "PPOConfig"):
     print("Running PPO:")
     print(f"Env-id: {config.env_id}")

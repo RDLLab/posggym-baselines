@@ -47,14 +47,14 @@ class IPPOConfig(PPOConfig):
         if self.use_lstm:
             model_cls = PPOLSTMModel
             model_kwargs = {
-                "input_size": np.prod(self.obs_space.shape) + one_hot_size
-                if self.use_previous_action
-                else 0,
+                "input_size": np.prod(self.obs_space.shape)
+                + (one_hot_size if self.use_previous_action else 0),
                 "num_actions": num_actions,
                 "trunk_sizes": self.trunk_sizes,
                 "lstm_size": self.lstm_size,
                 "lstm_layers": self.lstm_num_layers,
                 "head_sizes": self.head_sizes,
+                "use_residual_lstm": self.use_residual_lstm,
             }
         else:
             model_cls = PPOMLPModel

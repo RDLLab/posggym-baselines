@@ -1,0 +1,30 @@
+eval_interval: 100
+eval_episodes: 100
+num_eval_envs: 32
+total_timesteps: 100000000
+num_workers: 2
+num_envs: 32
+num_rollout_steps: 64
+seq_len: 10
+minibatch_size: 2048
+update_epochs: 2
+learning_rate: 0.0003
+anneal_lr: false
+gamma: 0.99
+gae_lambda: 0.95
+norm_adv: true
+clip_coef: 0.2
+clip_vloss: true
+vf_coef: 0.5
+ent_coef: 0.01
+max_grad_norm: 10
+target_kl: null
+use_lstm: true
+lstm_size: 64
+lstm_num_layers: 2
+trunk_sizes:
+  - 256
+  - 128
+  - 64
+head_sizes:
+  - 64
