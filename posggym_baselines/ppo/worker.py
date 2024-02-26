@@ -8,14 +8,19 @@ import torch.multiprocessing as mp
 import posggym_baselines.ppo.utils as ppo_utils
 from posggym_baselines.ppo.config import PPOConfig
 import numpy as np
+from gymnasium import spaces
 
 
-def one_hot(x, space):
-    # assert isinstance(space, MultiDiscrete)
-    return torch.cat(
-        [torch.nn.functional.one_hot(x[:, i], n) for i, n in enumerate(space.nvec)],
-        dim=-1,
-    )
+def one_hot(x: np.ndarray, space: spaces.Space) -> torch.Tensor:
+    if isinstance(space, spaces.MultiDiscrete):
+        return torch.cat(
+            [torch.nn.functional.one_hot(x[:, i], n) for i, n in enumerate(space.nvec)],
+            dim=-1,
+        )
+    elif isinstance(space, spaces.Discrete):
+        return torch.nn.functional.one_hot(x, space.n)
+    else:
+        return RuntimeError("Unspport Space")
 
 
 def run_rollout_worker(
@@ -62,14 +67,18 @@ def run_rollout_worker(
     # actor and critic setup
     policies = config.load_policies(device=device)
 
+    one_hot_size = (
+        config.act_space.n
+        if isinstance(config.act_space, spaces.Discrete)
+        else config.act_space.nvec.sum()
+    )
+
     # worker buffers
     buf_shape = (config.num_rollout_steps, config.num_envs, config.num_agents)
     policy_idx_buf = torch.zeros(buf_shape).long().to(device)
     obs_buf_shape = buf_shape + config.obs_space.shape
     if config.use_previous_action:
-        obs_buf_shape = obs_buf_shape[:-1] + (
-            obs_buf_shape[-1] + envs.env.unwrapped.single_action_spaces["0"].nvec.sum(),
-        )
+        obs_buf_shape = obs_buf_shape[:-1] + (obs_buf_shape[-1] + one_hot_size,)
     obs_buf = torch.zeros(obs_buf_shape).to(device)
     actions_buf = torch.zeros(buf_shape + config.act_space.shape).to(device)
     logprobs_buf = torch.zeros(buf_shape).to(device)
@@ -100,18 +109,30 @@ def run_rollout_worker(
         torch.zeros(lstm_state_shape).to(config.worker_device),
         torch.zeros(lstm_state_shape).to(config.worker_device),
     )
-    next_action = (
-        torch.zeros((*next_vars_shape, envs.action_spaces["0"].shape[1]))
-        .long()
-        .to(config.worker_device)
+    action_dim = (
+        1
+        if isinstance(config.act_space, spaces.Discrete)
+        else list(envs.action_spaces.values())[0].shape[1]
     )
+    next_action = (
+        torch.zeros((*next_vars_shape, action_dim)).long().to(config.worker_device)
+    )
+    if isinstance(config.act_space, spaces.Discrete):
+        next_action = next_action.squeeze(dim=-1)
+
     if config.use_previous_action:
+        one_hot_size = int(
+            config.act_space.n
+            if isinstance(config.act_space, spaces.Discrete)
+            else config.act_space.nvec.sum()
+        )
+
         initial_actions = (
             torch.zeros(
                 (
                     config.num_envs,
                     config.num_agents,
-                    envs.env.unwrapped.single_action_spaces["0"].nvec.sum(),
+                    one_hot_size,
                 )
             )
             .long()
@@ -119,7 +140,7 @@ def run_rollout_worker(
         )
         initial_actions = initial_actions.reshape(
             *next_obs.shape[:-1],
-            envs.env.unwrapped.single_action_spaces["0"].nvec.sum(),
+            one_hot_size,
         )
         next_obs = torch.cat((next_obs, initial_actions), dim=-1)
 
@@ -205,8 +226,13 @@ def run_rollout_worker(
             values_buf[step] = next_values
 
             # execute step.
+            _next_action = (
+                next_action.reshape(-1)
+                if isinstance(config.act_space, spaces.Discrete)
+                else next_action
+            )
             next_obs, reward, terminated, truncated, dones, infos = envs.step(
-                next_action.cpu().numpy()
+                _next_action.cpu().numpy()
             )
             if config.use_previous_action:
                 next_obs = np.concatenate(
@@ -214,7 +240,7 @@ def run_rollout_worker(
                         next_obs,
                         one_hot(
                             next_action.flatten(start_dim=0, end_dim=1),
-                            envs.env.unwrapped.single_action_spaces["0"],
+                            list(envs.env.unwrapped.single_action_spaces.values())[0],
                         ).numpy(),
                     ),
                     axis=-1,

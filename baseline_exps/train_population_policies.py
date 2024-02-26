@@ -66,7 +66,9 @@ def get_env_creator_fn(
             env = RecordVideo(env, config.video_dir)
         env = FlattenObservations(env)
 
-        if isinstance(env.action_spaces["0"], spaces.Box):
+        if all(
+            isinstance(env.action_spaces[key], spaces.Box) for key in env.action_spaces
+        ):
             env = DiscretizeActions(env, 4, False)
 
         seed = config.seed + env_idx
@@ -111,7 +113,7 @@ def train(
     env_kwargs = env_data.env_kwargs
 
     env_data_path = exp_utils.ENV_DATA_DIR / full_env_id.value
-    if env_data_path / "PPOConfig.yaml":
+    if (env_data_path / "PPOConfig.yaml").exists():
         import yaml
 
         with open(env_data_path / "PPOConfig.yaml", "r") as file:

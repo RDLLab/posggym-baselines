@@ -326,6 +326,13 @@ class PPOLSTMModel(PPOModel):
         assert lstm_state is not None
         hidden, lstm_state = self.get_states(x, lstm_state, done)
         logits = self.actor(hidden)
+
+        def transpose(x):
+            return x
+
+        def transposeSum(x):
+            return x
+
         if isinstance(self.num_actions, list):
             # We split this in to batches for running through categorical
             # One batch for each agent
@@ -333,13 +340,19 @@ class PPOLSTMModel(PPOModel):
                 logits.shape[0], len(self.num_actions), self.num_actions[0]
             ).transpose(1, 0)
 
+            def transpose(x):  # noqa: F811
+                return x.T
+
+            def transposeSum(x):  # noqa: F811
+                return x.T.sum(1)
+
         probs = Categorical(logits=logits)
-        action = probs.sample() if action is None else action.T
+        action = probs.sample() if action is None else transpose(action)
 
         return (
-            action.T,
-            probs.log_prob(action).T.sum(1),
-            probs.entropy().T.sum(1),
+            transpose(action),
+            transposeSum(probs.log_prob(action)),
+            transposeSum(probs.entropy()),
             self.critic(hidden),
             lstm_state,
         )
