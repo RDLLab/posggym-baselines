@@ -4,5 +4,3 @@ env_kwargs:
   num_agents: 2
   should_randomze_dyn: True
   control_type: "ForceNonHolonomoic"
-  obs_dist: 20
-  n_sensors: 48

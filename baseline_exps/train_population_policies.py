@@ -32,6 +32,7 @@ from typing_extensions import Annotated
 import typer
 from enum import Enum
 from pathlib import Path
+import re
 
 app = typer.Typer()
 
@@ -85,6 +86,7 @@ def get_env_creator_fn(
     context_settings={"allow_extra_args": True, "ignore_unknown_options": True}
 )
 def train(
+    ctx: typer.Context,
     pop_training_alg: Annotated[Algs, typer.Option(case_sensitive=False)],
     full_env_id: Annotated[TrainableEnvs, typer.Option()],
     pop_size: Annotated[
@@ -138,7 +140,20 @@ def train(
             else:
                 config_kwargs[k] = v
 
-    config_kwargs = {**config_kwargs, **loaded_config}
+    for arg in ctx.args:
+        pattern = r"--(\w+)=(\w+)"
+        matches = re.match(pattern, arg)
+        if matches:
+            key = matches.group(1)
+            value = matches.group(2)
+            if key in config_kwargs["env_kwargs"]:
+                original_type = type(config_kwargs["env_kwargs"][key])
+                config_kwargs["env_kwargs"][key] = original_type(value)
+            elif key in config_kwargs:
+                original_type = type(config_kwargs[key])
+                config_kwargs[key] = original_type(value)
+
+    config_kwargs = {**loaded_config, **config_kwargs}
 
     if pop_training_alg.value.startswith("KLR"):
         if pop_training_alg == Algs.KLR_BR:

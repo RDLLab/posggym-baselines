@@ -6,6 +6,11 @@ import numpy as np
 import seaborn as sns
 from torch.utils.tensorboard import SummaryWriter
 
+try:
+    import wandb
+except ImportError:
+    wandb = None
+
 
 class Logger(abc.ABC):
     """Abstract class for logging training stats and other outputs."""
@@ -51,7 +56,8 @@ class TensorBoardLogger(Logger):
         self.track_wandb = config.track_wandb
 
         if self.track_wandb:
-            import wandb
+            if wandb is None:
+                raise ImportError("Weights and Biases not installed :(")
 
             wandb.init(
                 project=config.wandb_project,
@@ -108,7 +114,8 @@ class TensorBoardLogger(Logger):
     def close(self):
         self.writer.close()
         if self.config.track_wandb:
-            import wandb
+            if wandb is None:
+                raise ImportError("Weights and Biases not installed :(")
 
             wandb.finish()
 

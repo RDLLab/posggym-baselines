@@ -2,11 +2,11 @@ eval_interval: 100
 eval_episodes: 100
 num_eval_envs: 32
 total_timesteps: 100000000
-num_workers: 2
+num_workers: 8
 num_envs: 32
 num_rollout_steps: 64
 seq_len: 10
-minibatch_size: 2048
+minibatch_size: 4096
 update_epochs: 2
 learning_rate: 0.0003
 anneal_lr: false
@@ -28,3 +28,6 @@ trunk_sizes:
   - 64
 head_sizes:
   - 64
+  - 32
+use_residual_lstm: true
+use_previous_action: false
