@@ -11,6 +11,7 @@ import numpy as np
 import torch
 
 from posggym_baselines.ppo.config import PPOConfig
+from posggym_baselines.ppo.core import load_policies
 from posggym_baselines.ppo.network import PPOLSTMModel, PPOMLPModel, PPOModel
 from gymnasium import spaces
 
@@ -71,6 +72,11 @@ class IPPOConfig(PPOConfig):
         }
         if self.include_BR:
             policies["BR"] = model_cls(**model_kwargs).to(device)
+
+        if self.load_dir is not None:
+            print(f"Loading policies from {self.load_dir}")
+            return load_policies(self, self.load_dir, policies=policies)
+
         return policies
 
     def get_policy_partner_distribution(self, policy_id: str) -> Dict[str, float]:

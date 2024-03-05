@@ -1,30 +1,13 @@
-"""Script for training population RL policies for the experiment environments.
-
-Each population policy is trained using PPO. Supports both SP and KLR training with
-and without best-response (BR) policies.
-
-The number of policies in the population is specified by `pop_size`. For KLR, this
-controls the max reasoning level `K`, e.g `pop_size=4` means `K=3` for KLR (includes
-policies for `K=0`, `K=1`, `K=2`, and `K=3`) or `K=2` for KLR plus BR (KLR-BR) (includes
-policies for `K=0`, `K=1`, `K=2`, and `BR`). For SP, this is the number of independent
-policies in the population, including BR if using SP plus BR (SP-BR).
-
-Training statistics are logged using tensorboard and wandb. To disable logging to wandb,
-set `--track_wandb=False`. To disable all logging (i.e. for debugging), set
-`--disable_logging=True`.
-
-Use `--help` to see all available options.
-
-"""
+from posggym_baselines.ppo.core import load_policies
 from copy import deepcopy
 from typing import Callable, Optional
 
-import exp_utils
+from baseline_exps import exp_utils
 import posggym
 from posggym.wrappers import FlattenObservations, RecordVideo, DiscretizeActions
 
 from posggym_baselines.ppo.config import PPOConfig
-from posggym_baselines.ppo.core import run_ppo
+from posggym_baselines.ppo.eval import render_policies
 from posggym_baselines.ppo.ippo import IPPOConfig
 from posggym_baselines.ppo.klr_ppo import KLRPPOConfig
 from gymnasium import spaces
@@ -61,8 +44,7 @@ def get_env_creator_fn(
 
     def thunk():
         capture_video = config.capture_video and env_idx == 0 and worker_idx == 0
-        render_mode = "rgb_array" if capture_video else None
-        env = posggym.make(config.env_id, render_mode=render_mode, **config.env_kwargs)
+        env = posggym.make(config.env_id, render_mode="human", **config.env_kwargs)
         if capture_video:
             env = RecordVideo(env, config.video_dir)
         env = FlattenObservations(env)
@@ -107,7 +89,6 @@ def train(
     num_workers: Annotated[int, typer.Option()] = 2,
     use_lstm: Annotated[bool, typer.Option()] = True,
     log_dir: Annotated[Path, typer.Option()] = Path("."),
-    load_dir: Annotated[Optional[Path], typer.Option()] = None,
 ):
     d = deepcopy(locals())
 
@@ -123,7 +104,7 @@ def train(
             loaded_config = yaml.safe_load(file)
     else:
         loaded_config = {}
-
+    # env_kwargs["env_kwargs"]["render_mode"] = "human"
     config_kwargs = deepcopy(exp_utils.DEFAULT_PPO_CONFIG)
     config_kwargs.update(
         {
@@ -133,7 +114,6 @@ def train(
             "env_kwargs": env_kwargs["env_kwargs"],
         }
     )
-
     config_kwargs = {**config_kwargs, **loaded_config}
 
     for k, v in d.items():
@@ -185,8 +165,9 @@ def train(
             **config_kwargs,
         )
 
-    print(config)
-    run_ppo(config)
+    p = load_policies(config, save_dir=Path("."), device=config.eval_device)
+    env = config.load_vec_env(1)
+    render_policies([p, p], 100, env, config)
 
 
 if __name__ == "__main__":

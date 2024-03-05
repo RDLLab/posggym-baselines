@@ -318,14 +318,13 @@ def render_policies(
 
     for policy_ids in product(*policies):
         print(f"\nRendering policies: {policy_ids}")
-
         next_obs = (
             torch.tensor(env.reset()[0])
             .float()
             .to(device)
             .reshape(num_envs, num_agents, -1)
         )
-        next_action = torch.zeros((num_envs, num_agents)).long().to(device)
+        next_action = torch.zeros((num_envs, num_agents, 2)).long().to(device)
         next_done = torch.zeros((num_envs, num_agents)).to(device)
         next_lstm_state = (
             torch.zeros(
@@ -359,13 +358,13 @@ def render_policies(
                         obs_i, lstm_state_i, done_i
                     )
 
-                    next_action[:, i] = actions_i
+                    next_action[:, i, :] = actions_i
                     if lstm_state_i is not None:
                         next_lstm_state[0][:, :, i] = lstm_state_i[0]
                         next_lstm_state[1][:, :, i] = lstm_state_i[1]
 
             next_obs, rews, terms, truncs, dones, _ = env.step(
-                next_action.reshape(-1).cpu().numpy()
+                next_action.cpu().numpy()
             )
             agents_done = terms | truncs
             next_obs = (

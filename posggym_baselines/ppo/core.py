@@ -516,19 +516,20 @@ def load_policies(
     config: "PPOConfig",
     save_dir: Path,
     checkpoint: Optional[int] = None,
+    policies: Optional[Dict[str, PPOModel]] = None,
     device: Optional[Union[str, torch.device]] = None,
 ) -> Dict[str, PPOModel]:
     """Load policies from checkpoint files.
 
     If checkpoint is None, load the latest checkpoint.
     """
-    checkpoint_files = save_dir.glob("checkpoint*.pt")
-    if not checkpoint_files:
+    checkpoint_files = list(save_dir.glob("checkpoint*.pt"))
+    if len(checkpoint_files) == 0:
         raise ValueError(f"No checkpoint files found in {save_dir}")
 
     if not checkpoint:
         checkpoint_files = sorted(checkpoint_files, key=lambda x: x.name)
-        checkpoint = int(checkpoint_files[-1].split("_")[1])
+        checkpoint = int(checkpoint_files[-1].name.split("_")[1])
 
     policy_checkpoint_files = {}
     for f in checkpoint_files:
@@ -539,7 +540,10 @@ def load_policies(
         policy_checkpoint_files[policy_id] = save_dir / f
 
     device = device or config.device
-    policies = config.load_policies(device=device)
+
+    if policies is None:
+        policies = config.load_policies(device=device)
+
     for policy_id, policy in policies.items():
         checkpoint_file = policy_checkpoint_files[policy_id]
         checkpoint = torch.load(checkpoint_file, map_location=device)
