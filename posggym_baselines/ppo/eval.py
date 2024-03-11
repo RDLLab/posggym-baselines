@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.multiprocessing as mp
-
+from copy import deepcopy
 from posggym_baselines.ppo.network import PPOModel
 
 
@@ -298,6 +298,23 @@ def run_train_distribution_evaluation(
     return pw_returns
 
 
+def get_dynamics(env):
+    body0, shape0 = env.unwrapped.model.world.entities["vehicle_0"]
+
+    mass0 = body0.mass
+    friction0 = shape0.friction
+    elasticity0 = shape0.elasticity
+    # succ0, succ1 = terms
+
+    body1, shape1 = env.unwrapped.model.world.entities["vehicle_1"]
+
+    mass1 = body1.mass
+    friction1 = shape1.friction
+    elasticity1 = shape1.elasticity
+
+    return (mass0, friction0, elasticity0), (mass1, friction1, elasticity1)
+
+
 def render_policies(
     policies: List[Dict[str, PPOModel]], num_episodes: int, env, config: "PPOConfig"
 ) -> Dict[str, np.ndarray]:
@@ -315,6 +332,9 @@ def render_policies(
     assert len(policies) == config.num_agents
     num_envs, num_agents = 1, config.num_agents
     device = config.eval_device
+    mass_results = {}
+    friction_results = {}
+    elasticity_results = {}
 
     for policy_ids in product(*policies):
         print(f"\nRendering policies: {policy_ids}")
@@ -342,9 +362,15 @@ def render_policies(
         timesteps = np.zeros((num_envs, 1))
         ep_returns = []
         ep_disc_returns = []
+        data = None
+
+        current_reward = []
 
         while num_dones.sum() < num_episodes:
-            env.render()
+            # env.render()
+            if data is None:
+                data = deepcopy(get_dynamics(env.envs[0]))
+
             with torch.no_grad():
                 for i, policy_id in enumerate(policy_ids):
                     policy = policies[i][policy_id]
@@ -378,6 +404,7 @@ def render_policies(
             )
 
             rews = rews.reshape((num_envs, num_agents))
+            current_reward.append(rews)
 
             per_env_disc_return += config.gamma**timesteps * rews
             per_env_return += rews
@@ -385,20 +412,44 @@ def render_policies(
 
             for env_idx, flag in enumerate(dones):
                 # If an episode in one of the environments ends
+
                 if flag:
+                    (mass0, friction0, elasticity0), (
+                        mass1,
+                        friction1,
+                        elasticity1,
+                    ) = data
+                    # env.
+                    # succ0, succ1 = terms
+
+                    succ0 = np.array(current_reward).squeeze()[:, 0].max() >= 1
+                    succ1 = np.array(current_reward).squeeze()[:, 1].max() >= 1
+
+                    mass_results[mass0] = succ0
+                    friction_results[friction0] = succ0
+                    elasticity_results[elasticity0] = succ0
+
+                    mass_results[mass1] = succ1
+                    friction_results[friction1] = succ1
+                    elasticity_results[elasticity1] = succ1
+
+                    data = deepcopy(get_dynamics(env.envs[env_idx]))
+                    # print(data)
+
                     timesteps[env_idx] = 0
                     num_dones[env_idx] += 1
                     ep_returns.append(per_env_return[env_idx].copy())
                     ep_disc_returns.append(per_env_disc_return[env_idx].copy())
                     per_env_return[env_idx] = 0
                     per_env_disc_return[env_idx] = 0
+                    current_reward = []
 
         mean_ep_returns = np.mean(ep_returns, axis=0)
         std_ep_returns = np.std(ep_returns, axis=0)
 
         mean_ep_disc_returns = np.mean(ep_disc_returns, axis=0)
         std_ep_disc_returns = np.std(ep_disc_returns, axis=0)
-        env.close()
+        # env.close()
 
         print(f"policy_ids={policy_ids}")
         for i, policy_id in enumerate(policy_ids):
@@ -408,3 +459,4 @@ def render_policies(
                 f"- disc. return = {mean_ep_disc_returns[i]:.2f} "
                 f"+/- {std_ep_disc_returns[i]:.2f}"
             )
+    return mass_results, friction_results, elasticity_results

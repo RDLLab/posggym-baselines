@@ -33,6 +33,7 @@ import typer
 from enum import Enum
 from pathlib import Path
 import re
+import functools
 
 app = typer.Typer()
 
@@ -55,7 +56,10 @@ class Algs(str, Enum):
 
 
 def get_env_creator_fn(
-    config: PPOConfig, env_idx: int, worker_idx: Optional[int] = None
+    config: PPOConfig,
+    env_idx: int,
+    worker_idx: Optional[int] = None,
+    n_actions: int = 4,
 ) -> Callable:
     """Get function for creating the environment."""
 
@@ -70,7 +74,7 @@ def get_env_creator_fn(
         if all(
             isinstance(env.action_spaces[key], spaces.Box) for key in env.action_spaces
         ):
-            env = DiscretizeActions(env, 4, False)
+            env = DiscretizeActions(env, n_actions, False)
 
         seed = config.seed + env_idx
         if worker_idx is not None:
@@ -108,6 +112,7 @@ def train(
     use_lstm: Annotated[bool, typer.Option()] = True,
     log_dir: Annotated[Path, typer.Option()] = Path("."),
     load_dir: Annotated[Optional[Path], typer.Option()] = None,
+    n_actions: Annotated[int, typer.Option()] = 4,
 ):
     d = deepcopy(locals())
 
@@ -128,7 +133,9 @@ def train(
     config_kwargs.update(
         {
             "exp_name": f"{pop_training_alg.value}_{full_env_id.value}_N{pop_size}",
-            "env_creator_fn": get_env_creator_fn,
+            "env_creator_fn": functools.partial(
+                get_env_creator_fn, n_actions=n_actions
+            ),
             "env_id": env_kwargs["env_id"],
             "env_kwargs": env_kwargs["env_kwargs"],
         }

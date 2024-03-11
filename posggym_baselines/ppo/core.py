@@ -530,6 +530,7 @@ def load_policies(
     if not checkpoint:
         checkpoint_files = sorted(checkpoint_files, key=lambda x: x.name)
         checkpoint = int(checkpoint_files[-1].name.split("_")[1])
+        print(checkpoint)
 
     policy_checkpoint_files = {}
     for f in checkpoint_files:

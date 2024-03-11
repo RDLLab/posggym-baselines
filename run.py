@@ -54,6 +54,7 @@ def get_env_creator_fn(
         ):
             env = DiscretizeActions(env, 4, False)
 
+        # seed = random.random
         seed = config.seed + env_idx
         if worker_idx is not None:
             seed += worker_idx
@@ -167,7 +168,11 @@ def train(
 
     p = load_policies(config, save_dir=Path("."), device=config.eval_device)
     env = config.load_vec_env(1)
-    render_policies([p, p], 100, env, config)
+    mass_results, friction_results, elasticity_results = render_policies(
+        [p, p], 100, env, config
+    )
+    # print(x)
+    print("anc")
 
 
 if __name__ == "__main__":

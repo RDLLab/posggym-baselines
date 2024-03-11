@@ -4,3 +4,4 @@ env_kwargs:
   num_agents: 2
   should_randomze_dyn: True
   control_type: "ForceNonHolonomoic"
+  distance_punishment: 0.0005
