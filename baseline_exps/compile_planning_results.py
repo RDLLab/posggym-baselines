@@ -17,10 +17,11 @@ Script has two modes:
     into a single file.
 
 """
+
 import argparse
 import warnings
 from pathlib import Path
-from typing import Dict
+from typing import Any, Dict
 
 import pandas as pd
 import yaml
@@ -69,7 +70,7 @@ def compile_sub_experiment_results(
             assert num_episodes == sub_exp_results_df["num"].max() + 1
             mean_results = sub_exp_results_df.mean(axis=0).to_dict()
             std_results = sub_exp_results_df.std(axis=0).to_dict()
-            summary_results = {
+            summary_results: Dict[str, Any] = {
                 "num_episodes": num_episodes,
             }
             for k, v in mean_results.items():
@@ -126,7 +127,7 @@ def combine_all_experiment_results(
     Arguments
     ---------
     parent_dirs
-        List of paths to parent directories containing experiment results.
+        Path of parent directory containing experiment results directories.
     save_to_file
         Whether to save combined results to file. Will be saved to `parent_dir` as
         `<env_id>[_agent_id]_planning_results.csv`.
@@ -158,14 +159,13 @@ def combine_all_experiment_results(
 
     # maps env_id -> [alg results]
     all_env_exp_results = {}
+    # maps (env_id, alg) -> num_episodes
+    num_episodes = {}
     for exp_parent_dir in exp_parent_dirs:
         tokens = exp_parent_dir.name.split("_")
         alg, env_id = tokens[:2]
         if tokens[2].startswith("i"):
             env_id += "_" + tokens[2]
-
-        if env_id not in all_env_exp_results:
-            all_env_exp_results[env_id] = []
 
         if alg == "COMBINED" and not combined:
             warnings.warn(
@@ -184,6 +184,17 @@ def combine_all_experiment_results(
 
         # add alg name as column to results
         env_alg_results.insert(0, "alg", alg)
+
+        if (env_id, alg) not in num_episodes:
+            num_episodes[(env_id, alg)] = env_alg_results["num"].max() + 1
+        else:
+            # duplicate results for this (env, alg) combination
+            # increment "num" column by the number of episodes in previous results
+            env_alg_results["num"] += num_episodes[(env_id, alg)]
+            num_episodes[(env_id, alg)] += env_alg_results["num"].max() + 1
+
+        if env_id not in all_env_exp_results:
+            all_env_exp_results[env_id] = []
         all_env_exp_results[env_id].append(env_alg_results)
 
     all_env_results = {
