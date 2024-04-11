@@ -1,29 +1,20 @@
-# Registering Rllib trained agents
+# Registering RL PyTorch agents to POSGGym
 
-Given an Rllib trained agent that has been saved to a checkpoint, you can register it with posggym by following the steps below:
+Given an PyTorch RL agent that has been saved to a checkpoint, you can register it with posggym by following the steps below:
 
 ## 1. Save the new policy models state
 
-We need to save the policy configuration and it's weights to a file. This can be done using the `rllib_to_posggym_agent_file.py` script.:
+We need to save the policy configuration and it's weights to a file. This can be done using the `save_to_posggym_format.py` script.:
 
-For example, given the output of the training is saved in `~/posggym_results/env_name/policies/run_name/None/pi_SP/` and we want to save the `pi_SP` policy from the checkpoint `checkpoint_001000`:
-
-```bash
-python rllib_to_posggym_agent_file.py \
-    --checkpoint ~/posggym_results/env_name/policies/run_name/None/pi_SP/checkpoint_001000/policies/pi_SP/policy_state.pkl \
-    --config ~/posggym_results/env_name/policies/run_name/None/pi_SP/algorithm_config.pkl \
-    --output ~/posggym_results/env_name/policies/run_name/None/pi_SP/sp_seed0.pkl
-
-```
-
-Or for checkpoints from new training script that uses `ray.tune`:
+For example, given `checkpoint*.pt` checkpoints stored in `my_checkpoint_dir`, you can run:
 
 ```bash
-python rllib_to_posggym_agent_file_v2.py \
-    --checkpoint ~/posggym_results/env_name/policies/run_name/None/pi_SP/checkpoint_001000/policies/pi_SP/policy_state.pkl \
-    --output ~/posggym_results/env_name/policies/run_name/None/pi_SP/sp_seed0.pkl
-
+python save_to_posggym_format.py \
+    --checkpoint_dir ~/path/to/my_checkpoint_dir \
+    --output_dir ~/path/to/output_dir
 ```
+
+This will load the extract the latest checkpoint weights, reformat into the format that the `posggym.agent.TorchPolicy` expects, and save this as in pickle format in `output_dir`.
 
 ## 2. Save the new policy file into the `posggym-agent-models` repository
 
