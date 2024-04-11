@@ -19,6 +19,12 @@ pip install -e .[exps]
 
 Note, you will also need [jupyter notebook](https://jupyter.org/install) installed to view and run analysis notebooks.
 
+You can verify the install by running:
+
+```bash
+python tests/planning/test_pomcp.py
+```
+
 ## Planning Algorithms
 
 POSGGym-Baselines includes implementations of a number partially observable, multi-agent planning algorithms, including:
