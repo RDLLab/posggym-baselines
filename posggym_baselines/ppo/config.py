@@ -1,4 +1,5 @@
 """Base configuration for RCPD."""
+
 from __future__ import annotations
 
 import random
@@ -13,7 +14,6 @@ from posggym.wrappers import RecordEpisodeStatistics, StackEnv
 
 from posggym_baselines.config import BASE_RESULTS_DIR
 from posggym_baselines.ppo.eval import EvalFn, run_all_pairwise_evaluation
-
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -64,9 +64,9 @@ class PPOConfig:
     # wandb project name
     wandb_project: str = "posggym_baselines"
     # wandb entity name
-    wandb_entity: str = None
+    wandb_entity: Optional[str] = None
     # wandb group name
-    wandb_group: str = None
+    wandb_group: Optional[str] = None
     # Directory where the model and logs will be saved
     log_dir: Path = field(init=False)
     # Directory where videos will be saved
@@ -74,7 +74,7 @@ class PPOConfig:
     # Directory where models will be saved
     model_dir: Path = field(init=False)
     # optional directory to load existing algorithm/model from
-    load_dir: Path = None
+    load_dir: Optional[Path] = None
     # number of updates (i.e. batches) after which the model/algorithm is saved
     # if 0, never save
     # if > 0, save every save_interval updates

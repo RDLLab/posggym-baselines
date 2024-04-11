@@ -1,4 +1,5 @@
 """Implementation of rollout workers which collect trajectories for PPO training."""
+
 import contextlib
 from multiprocessing.queues import Empty
 
@@ -57,7 +58,9 @@ def run_rollout_worker(
     buf_shape = (config.num_rollout_steps, config.num_envs, config.num_agents)
     policy_idx_buf = torch.zeros(buf_shape).long().to(device)
     obs_buf = torch.zeros(buf_shape + config.obs_space.shape).to(device)
-    actions_buf = torch.zeros(buf_shape + config.act_space.shape).to(device)
+    actions_buf = torch.zeros(
+        buf_shape + () if config.act_space.shape is None else config.act_space.shape
+    ).to(device)
     logprobs_buf = torch.zeros(buf_shape).to(device)
     rewards_buf = torch.zeros(buf_shape).to(device)
     # +1 for bootstrapped value

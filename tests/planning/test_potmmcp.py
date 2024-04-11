@@ -1,11 +1,16 @@
 """Tests for planning.potmmcp.core."""
+
 import math
 
 import posggym
 import posggym.agents as pga
-from posggym_baselines.planning.config import MCTSConfig
-from posggym_baselines.planning.other_policy import OtherAgentMixturePolicy
-from posggym_baselines.planning.potmmcp import POTMMCP, POTMMCPMetaPolicy
+
+from posggym_baselines.planning import (
+    POTMMCP,
+    MCTSConfig,
+    OtherAgentMixturePolicy,
+    POTMMCPMetaPolicy,
+)
 
 
 def run_policies(env, planner, other_policy, planning_agent_id, other_agent_id):
@@ -36,7 +41,7 @@ def test_with_single_random_policies():
         c=math.sqrt(2),
         truncated=False,
         action_selection="pucb",
-        root_exploration_fraction=0.25,
+        pucb_exploration_fraction=0.25,
         known_bounds=None,
         step_limit=None,
         epsilon=0.92,  # depth_limit=2
@@ -87,7 +92,7 @@ def test_with_other_policies_and_random_meta_policy():
         c=math.sqrt(2),
         truncated=False,
         action_selection="pucb",
-        root_exploration_fraction=0.25,
+        pucb_exploration_fraction=0.25,
         known_bounds=None,
         step_limit=None,
         epsilon=0.92,  # depth_limit=2
@@ -144,7 +149,7 @@ def test_with_other_policies_and_uniform_meta_policy():
         c=math.sqrt(2),
         truncated=False,
         action_selection="pucb",
-        root_exploration_fraction=0.25,
+        pucb_exploration_fraction=0.25,
         known_bounds=None,
         step_limit=None,
         epsilon=0.92,  # depth_limit=2
@@ -207,7 +212,7 @@ def test_with_torch_other_and_meta_policies():
         c=math.sqrt(2),
         truncated=True,
         action_selection="pucb",
-        root_exploration_fraction=0.25,
+        pucb_exploration_fraction=0.25,
         known_bounds=None,
         step_limit=None,
         epsilon=0.92,  # depth_limit=2

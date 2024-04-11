@@ -5,6 +5,7 @@ a population of K-Level Reasoning policies where level 0 is a best-response poli
 the uniform random policy, and each level k > 0 is a best-response policy to the level
 k-1 policy.
 """
+
 import random
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
@@ -127,7 +128,7 @@ class KLRPPOConfig(PPOConfig):
         if self.include_BR:
             policies["BR"] = model_cls(**model_kwargs).to(device)
         policies["random"] = UniformRandomModel(self.act_space.n).to(device)
-        return policies
+        return policies  # type: ignore
 
     def get_policy_partner_distribution(self, policy_id: str) -> Dict[str, float]:
         if policy_id == "BR":

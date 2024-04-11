@@ -3,6 +3,7 @@
 This module implements the independent PPO (IPPO) population, which is a population of
 independent PPO policies, where each policy is trained in self-play.
 """
+
 import random
 from dataclasses import dataclass
 from typing import Dict, List, Optional
@@ -58,7 +59,7 @@ class IPPOConfig(PPOConfig):
         }
         if self.include_BR:
             policies["BR"] = model_cls(**model_kwargs).to(device)
-        return policies
+        return policies  # type: ignore
 
     def get_policy_partner_distribution(self, policy_id: str) -> Dict[str, float]:
         if policy_id == "BR":

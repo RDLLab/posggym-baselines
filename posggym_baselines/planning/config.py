@@ -7,14 +7,14 @@ from posggym_baselines.planning.utils import KnownBounds
 
 @dataclass
 class MCTSConfig:
-    """Configuration for POMMCP."""
+    """Configuration for MCTS based algorithms."""
 
     discount: float
     search_time_limit: float
     c: float
     truncated: bool
     action_selection: str = "pucb"
-    pucb_exploration_fraction: float = 0.25
+    pucb_exploration_fraction: float = 0.5
     known_bounds: Optional[KnownBounds] = None
     extra_particles_prop: float = 1.0 / 16
     reinvigoration_sample_limit_factor: float = 4.0

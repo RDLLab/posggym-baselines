@@ -105,7 +105,9 @@ class PlanningStatTracker:
                 if k in self.MAX_STATS:
                     self._all_stats[k].append(np.nanmax(self._current_stats[k]))
                 else:
-                    self._all_stats[k].append(np.nanmean(self._current_stats[k]))
+                    self._all_stats[k].append(
+                        np.nanmean(self._current_stats[k])  # type: ignore
+                    )
 
         self._current_steps = 0
         self._current_stats = {k: [] for k in self.STAT_KEYS}
@@ -281,6 +283,7 @@ class BeliefStatTracker:
             stats[f"belief_{k}_acc"] = v_mean
 
             if self.track_per_step:
+                assert self.step_limit is not None
                 for t in range(self.step_limit):
                     v_t = np.nan if t >= len(v) else v[t]
                     stats[f"belief_{k}_acc_{t}"] = v_t

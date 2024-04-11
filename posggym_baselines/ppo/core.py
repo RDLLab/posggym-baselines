@@ -1,4 +1,5 @@
 """The core PPO learner."""
+
 import contextlib
 import time
 from datetime import timedelta
@@ -200,8 +201,8 @@ class PPOLearner:
                 eval_time = time.time()
                 self.evaluate(
                     global_step,
-                    eval_recv_queue,
-                    eval_send_queue,
+                    eval_recv_queue,  # type: ignore
+                    eval_send_queue,  # type: ignore
                     termination_event,
                     update == self.config.num_updates,
                 )
@@ -524,9 +525,9 @@ def load_policies(
     policies = config.load_policies(device=device)
     for policy_id, policy in policies.items():
         checkpoint_file = policy_checkpoint_files[policy_id]
-        checkpoint = torch.load(checkpoint_file, map_location=device)
-        assert checkpoint is not None
-        policy.load_state_dict(checkpoint["model"])
+        checkpoint_map = torch.load(checkpoint_file, map_location=device)
+        assert checkpoint_map is not None
+        policy.load_state_dict(checkpoint_map["model"])
     return policies
 
 
