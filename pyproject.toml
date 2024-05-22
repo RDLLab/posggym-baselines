@@ -33,7 +33,7 @@ classifiers = [
     'Topic :: Scientific/Engineering :: Artificial Intelligence',
 ]
 dependencies = [
-    "posggym >=0.5.0",
+    "posggym[agents] >=0.5.0",
     "numpy >=1.21.0",
     "torch >=2.0.0",
     "wandb >=0.15",
@@ -41,8 +41,13 @@ dependencies = [
     "matplotlib >=3.7.1",
     "seaborn >=0.12.2",
     "psutil >=5.9.0",
+    "gymnasium >=0.26",
 ]
 dynamic = ["version"]
+
+[project.optional-dependencies]
+# dependencies for baseline experiments
+exps = ["pandas >=1.0", "pyyaml"]
 
 [project.urls]
 Homepage = "https://github.com/RDLLab/posggym-baselines"
@@ -99,3 +104,6 @@ reportUntypedFunctionDecorator = "none"
 reportPrivateImportUsage = "none"
 reportPrivateUsage = "warning"
 reportUnboundVariable = "warning"
+# this leads to lots of annoying errors
+reportAttributeAccessIssue = "none"
+reportArgumentType = "none"

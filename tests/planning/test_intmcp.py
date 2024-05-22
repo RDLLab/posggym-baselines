@@ -1,11 +1,14 @@
 """Tests for planning.potmmcp.core."""
+
 import math
 
 import posggym
 import posggym.agents as pga
-from posggym_baselines.planning.config import MCTSConfig
-from posggym_baselines.planning.intmcp import INTMCP
-from posggym_baselines.planning.search_policy import load_posggym_agents_search_policy
+from posggym_baselines.planning import (
+    INTMCP,
+    MCTSConfig,
+    load_posggym_agents_search_policy,
+)
 
 
 def run_policies(env, planner, other_policy, planning_agent_id, other_agent_id):
@@ -36,7 +39,7 @@ def test_with_random_search_policy(render_mode="human", nesting_level=1):
         c=math.sqrt(2),
         truncated=False,
         action_selection="ucb",
-        root_exploration_fraction=0.25,
+        pucb_exploration_fraction=0.25,
         known_bounds=None,
         step_limit=None,
         epsilon=0.92,  # depth_limit=2
@@ -76,7 +79,7 @@ def test_with_pga_search_policy(render_mode="human", nesting_level=1):
         c=math.sqrt(2),
         truncated=False,
         action_selection="ucb",
-        root_exploration_fraction=0.25,
+        pucb_exploration_fraction=0.25,
         known_bounds=None,
         step_limit=None,
         epsilon=0.92,  # depth_limit=2

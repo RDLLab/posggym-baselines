@@ -117,7 +117,7 @@ def train(
     d = deepcopy(locals())
 
     """Run training for KLR and KLR plus BR."""
-    env_data = exp_utils.get_env_data(None, None, full_env_id=full_env_id.value)
+    env_data = exp_utils.get_env_data(full_env_id)
     env_kwargs = env_data.env_kwargs
 
     env_data_path = exp_utils.ENV_DATA_DIR / full_env_id.value

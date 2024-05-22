@@ -3,6 +3,7 @@
 This module implements the independent PPO (IPPO) population, which is a population of
 independent PPO policies, where each policy is trained in self-play.
 """
+
 import random
 from dataclasses import dataclass
 from typing import Dict, List, Optional

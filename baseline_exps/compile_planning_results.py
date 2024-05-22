@@ -17,10 +17,11 @@ Script has two modes:
     into a single file.
 
 """
+
 import argparse
 import warnings
 from pathlib import Path
-from typing import Dict
+from typing import Any, Dict
 
 import pandas as pd
 import yaml
@@ -69,7 +70,7 @@ def compile_sub_experiment_results(
             assert num_episodes == sub_exp_results_df["num"].max() + 1
             mean_results = sub_exp_results_df.mean(axis=0).to_dict()
             std_results = sub_exp_results_df.std(axis=0).to_dict()
-            summary_results = {
+            summary_results: Dict[str, Any] = {
                 "num_episodes": num_episodes,
             }
             for k, v in mean_results.items():
@@ -88,7 +89,9 @@ def compile_sub_experiment_results(
             exp_args = yaml.safe_load(f)
 
         for k, v in exp_args.items():
-            if k == "num_episodes":
+            if k in ("belief_stats_to_track", "track_per_step_belief_stats"):
+                continue
+            elif k == "num_episodes":
                 k = "num_episodes_limit"
             sub_exp_results_df.insert(0, k, v)
 
@@ -110,8 +113,10 @@ def combine_all_experiment_results(
     parent_dir: Path,
     save_to_file: bool = True,
     summarize: bool = True,
-    save_to_main_results_dir: bool = False,
+    save_to_main: bool = False,
     combined: bool = False,
+    belief: bool = False,
+    per_step_belief: bool = False,
 ) -> Dict[str, pd.DataFrame]:
     """Combine results from all experiments (alg, env) in `parent_dir`.
 
@@ -122,7 +127,7 @@ def combine_all_experiment_results(
     Arguments
     ---------
     parent_dirs
-        List of paths to parent directories containing experiment results.
+        Path of parent directory containing experiment results directories.
     save_to_file
         Whether to save combined results to file. Will be saved to `parent_dir` as
         `<env_id>[_agent_id]_planning_results.csv`.
@@ -130,11 +135,15 @@ def combine_all_experiment_results(
         Whether to summarize results over all episodes. If True, will compute mean,
         std, and 95% confidence interval over all episodes for each (alg, env)
         sub-experiment Otherwise results will contain results for each episode.
-    save_to_main_results_dir
+    save_to_main
         Whether to save results to main `env_data` dir. Will overwrite existing
         results so be careful.
     combined
         Whether results are for combined RL+Planning experiments.
+    belief
+        Whether results are for belief experiments.
+    per_step_belief
+        Whether results are for per step belief experiments.
 
     Returns
     -------
@@ -150,14 +159,13 @@ def combine_all_experiment_results(
 
     # maps env_id -> [alg results]
     all_env_exp_results = {}
+    # maps (env_id, alg) -> num_episodes
+    num_episodes = {}
     for exp_parent_dir in exp_parent_dirs:
         tokens = exp_parent_dir.name.split("_")
         alg, env_id = tokens[:2]
         if tokens[2].startswith("i"):
             env_id += "_" + tokens[2]
-
-        if env_id not in all_env_exp_results:
-            all_env_exp_results[env_id] = []
 
         if alg == "COMBINED" and not combined:
             warnings.warn(
@@ -176,6 +184,17 @@ def combine_all_experiment_results(
 
         # add alg name as column to results
         env_alg_results.insert(0, "alg", alg)
+
+        if (env_id, alg) not in num_episodes:
+            num_episodes[(env_id, alg)] = env_alg_results["num"].max() + 1
+        else:
+            # duplicate results for this (env, alg) combination
+            # increment "num" column by the number of episodes in previous results
+            env_alg_results["num"] += num_episodes[(env_id, alg)]
+            num_episodes[(env_id, alg)] += env_alg_results["num"].max() + 1
+
+        if env_id not in all_env_exp_results:
+            all_env_exp_results[env_id] = []
         all_env_exp_results[env_id].append(env_alg_results)
 
     all_env_results = {
@@ -186,10 +205,14 @@ def combine_all_experiment_results(
     # save combined results
     if save_to_file:
         suffix = "_summary_results.csv" if summarize else "_results.csv"
+        if per_step_belief:
+            suffix = "_belief_per_step" + suffix
+        elif belief:
+            suffix = "_belief" + suffix
         suffix = "combined" + suffix if combined else "planning" + suffix
 
         for env_id in all_env_results:
-            if save_to_main_results_dir:
+            if save_to_main:
                 env_save_file = ENV_DATA_DIR / env_id / suffix
             else:
                 env_save_file = parent_dir / f"{env_id}_{suffix}"
@@ -222,7 +245,7 @@ if __name__ == "__main__":
         help="Whether to summarize results across episodes",
     )
     parser.add_argument(
-        "--save_to_main_results_dir",
+        "--save_to_main",
         action="store_true",
         help=(
             "Whether to save results to main `env_data` dir. Will overwrite existing "
@@ -234,6 +257,16 @@ if __name__ == "__main__":
         action="store_true",
         help="Whether results are for combined RL+Planning experiments.",
     )
+    parser.add_argument(
+        "--belief",
+        action="store_true",
+        help="Whether results are for belief experiments.",
+    )
+    parser.add_argument(
+        "--per_step_belief",
+        action="store_true",
+        help="Whether results are for per step belief experiments.",
+    )
     args = parser.parse_args()
 
     for parent_dir in args.exp_results_parent_dirs:
@@ -243,6 +276,8 @@ if __name__ == "__main__":
             combine_all_experiment_results(
                 parent_dir,
                 summarize=args.summarize,
-                save_to_main_results_dir=args.save_to_main_results_dir,
+                save_to_main=args.save_to_main,
                 combined=args.combined,
+                belief=args.belief,
+                per_step_belief=args.per_step_belief,
             )

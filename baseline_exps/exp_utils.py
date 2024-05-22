@@ -14,7 +14,7 @@ import yaml
 from posggym.agents.wrappers import AgentEnvWrapper
 
 from posggym_baselines.planning.config import MCTSConfig
-from posggym_baselines.planning.utils import PlanningStatTracker
+from posggym_baselines.planning.utils import BeliefStatTracker, PlanningStatTracker
 from posggym_baselines.utils.agent_env_wrapper import UniformOtherAgentFn
 from posggym_baselines.config import BASE_RESULTS_DIR
 
@@ -38,6 +38,7 @@ DEFAULT_PLANNING_CONFIG_KWARGS_PUCB = {
     "pucb_exploration_fraction": 0.5,
     "known_bounds": None,
     "extra_particles_prop": 1.0 / 16,
+    "reinvigoration_sample_limit_factor": 4.0,
     "step_limit": None,  # Set in algorithm, if env has a step limit
     "epsilon": 0.01,
     "seed": None,
@@ -156,6 +157,7 @@ class EnvData:
     # [P0, P1] -> [seed] -> model_file
     br_model_files: Dict[str, Dict[int, Path]]
     rl_br_results_file: Path
+    rl_br_training_results_files: Dict[str, Path]
 
     # Planning data
     # Meta policy pop_id -> meta_policy_type -> meta_policy
@@ -176,22 +178,14 @@ class EnvData:
         print("\n  ".join(output))
 
 
-# TODO remove env_id and agent_id and use full_env_id only
-#      (do this after all experiments are done)
-def get_env_data(
-    env_id: Optional[str], agent_id: Optional[str], full_env_id: Optional[str] = None
-):
+def get_env_data(full_env_id: str):
     """Get the env data for the given env name."""
-    if full_env_id is None:
-        assert env_id is not None
-        full_env_id = env_id if agent_id is None else f"{env_id}_i{agent_id}"
+    if len(full_env_id.split("_")) == 2:
+        env_id, agent_id = full_env_id.split("_")
+        agent_id = agent_id.replace("i", "")
     else:
-        if len(full_env_id.split("_")) == 2:
-            env_id, agent_id = full_env_id.split("_")
-            agent_id = agent_id.replace("i", "")
-        else:
-            env_id = full_env_id
-            agent_id = None
+        env_id = full_env_id
+        agent_id = None
     env_data_path = ENV_DATA_DIR / full_env_id
 
     env_kwargs_file = env_data_path / "env_kwargs.yaml"
@@ -199,18 +193,10 @@ def get_env_data(
         env_kwargs = yaml.safe_load(f)
 
     # Population Data
-    agents_P0_file = env_data_path / (
-        "agents_P0.yaml" if agent_id is None else f"agents_P0_i{agent_id}.yaml"
-    )
-
-    with open(agents_P0_file, "r") as f:
+    with open(env_data_path / "agents_P0.yaml", "r") as f:
         agents_P0 = yaml.safe_load(f)
 
-    agents_P1_file = env_data_path / (
-        "agents_P1.yaml" if agent_id is None else f"agents_P1_i{agent_id}.yaml"
-    )
-
-    with open(agents_P1_file, "r") as f:
+    with open(env_data_path / "agents_P1.yaml", "r") as f:
         agents_P1 = yaml.safe_load(f)
 
     other_agent_id = next(iter(agents_P0.keys()))
@@ -242,19 +228,14 @@ def get_env_data(
             pop_policy_names[pop_id] = policy_names
             pop_co_team_names[pop_id] = policy_names
 
-    # RL Data
+    # RL-BR Data
     br_models_dir = env_data_path / "br_models"
     br_model_files = {"P0": {}, "P1": {}}
     for model_file_name in br_models_dir.glob("*.pt"):
         model_name = model_file_name.with_suffix("").name
         tokens = model_name.split("_")
         train_pop = tokens[0]
-        if agent_id is not None:
-            assert tokens[1].startswith("i")
-            assert tokens[1] == f"i{agent_id}"
-            seed = int(tokens[2].replace("seed", ""))
-        else:
-            seed = int(tokens[1].replace("seed", ""))
+        seed = int(tokens[1].replace("seed", ""))
         br_model_files[train_pop][seed] = br_models_dir / model_file_name
 
     # Planninn Data
@@ -277,6 +258,9 @@ def get_env_data(
         policy_name_to_id=policy_name_to_id,
         br_model_files=br_model_files,
         rl_br_results_file=env_data_path / "br_results.csv",
+        rl_br_training_results_files={
+            p: env_data_path / f"{p}_br_training_results.csv" for p in ["P0", "P1"]
+        },
         meta_policy=meta_policy,
         planning_results_file=env_data_path / "planning_results.csv",
         planning_summary_results_file=env_data_path / "planning_summary_results.csv",
@@ -289,9 +273,9 @@ def load_all_env_data() -> Dict[str, EnvData]:
     all_env_data = {}
     full_env_ids = sorted([f.name for f in ENV_DATA_DIR.glob("*")])
     for full_env_id in full_env_ids:
-        if not (ENV_DATA_DIR / full_env_id).is_dir():
+        if not (ENV_DATA_DIR / full_env_id).is_dir() or full_env_id == "figures":
             continue
-        all_env_data[full_env_id] = get_env_data(None, None, full_env_id=full_env_id)
+        all_env_data[full_env_id] = get_env_data(full_env_id)
     return all_env_data
 
 
@@ -312,6 +296,9 @@ class PlanningExpParams:
     num_episodes: int
     # time limit for experiment
     exp_time_limit: int
+    # whether to track belief statistics (can slow down experiment time)
+    belief_stats_to_track: List[str]
+    track_per_step_belief_stats: bool
 
     # experiment details for saving results
     exp_name: str
@@ -345,6 +332,17 @@ class PlanningExpParams:
             "time",
         ] + PlanningStatTracker.STAT_KEYS
 
+        if self.track_per_step_belief_stats:
+            step_limit = posggym.spec(self.env_kwargs["env_id"]).max_episode_steps
+            belief_stat_keys = BeliefStatTracker.get_stat_keys(
+                self.belief_stats_to_track, track_per_step=True, step_limit=step_limit
+            )
+        else:
+            belief_stat_keys = BeliefStatTracker.get_stat_keys(
+                self.belief_stats_to_track, track_per_step=False, step_limit=None
+            )
+        self.episode_results_heads.extend(belief_stat_keys)
+
     def get_exp_results_file_name(self):
         file_name = f"{self.exp_num}_{self.planning_pop_id}_{self.test_pop_id}"
         file_name += f"_{self.config.search_time_limit:1g}"
@@ -360,6 +358,8 @@ class PlanningExpParams:
             "search_time_limit": self.config.search_time_limit,
             "num_episodes": self.num_episodes,
             "exp_time_limit": self.exp_time_limit,
+            "belief_stats_to_track": self.belief_stats_to_track,
+            "track_per_step_belief_stats": self.track_per_step_belief_stats,
         }
 
     def setup_exp(self):
@@ -441,14 +441,7 @@ class CombinedExpParams(PlanningExpParams):
 
     def __post_init__(self):
         super().__post_init__()
-
-        policy_file_name = f"{self.rl_policy_pop_id}"
-        if self.full_env_id == "PursuitEvasion-v1_i0":
-            policy_file_name += "_i0"
-        elif self.full_env_id == "PursuitEvasion-v1_i1":
-            policy_file_name += "_i1"
-        policy_file_name += f"_seed{self.rl_policy_seed}.pt"
-
+        policy_file_name = f"{self.rl_policy_pop_id}_seed{self.rl_policy_seed}.pt"
         self.rl_policy_file = self.env_data_dir / "br_models" / policy_file_name
 
     def get_exp_results_file_name(self):
@@ -469,6 +462,8 @@ class CombinedExpParams(PlanningExpParams):
             "search_time_limit": self.config.search_time_limit,
             "num_episodes": self.num_episodes,
             "exp_time_limit": self.exp_time_limit,
+            "belief_stats_to_track": self.belief_stats_to_track,
+            "track_per_step_belief_stats": self.track_per_step_belief_stats,
         }
 
 
@@ -492,6 +487,13 @@ def run_planning_exp(exp_params: PlanningExpParams):
     # disable tracking overall stats since we only log per episode
     planner.stat_tracker.track_overall = False
 
+    belief_tracker = BeliefStatTracker(
+        planner,
+        env,
+        track_per_step=exp_params.track_per_step_belief_stats,
+        stats_to_track=exp_params.belief_stats_to_track,
+    )
+
     # run episode loop
     exp_start_time = time.time()
     episode_num = 0
@@ -501,6 +503,7 @@ def run_planning_exp(exp_params: PlanningExpParams):
     ):
         obs, _ = env.reset()
         planner.reset()
+        belief_tracker.reset()
 
         episode_results = {
             "num": episode_num,
@@ -526,9 +529,11 @@ def run_planning_exp(exp_params: PlanningExpParams):
                 exp_params.config.discount ** episode_results["len"] * reward
             )
             episode_results["len"] += 1
+            belief_tracker.step(env)
 
         episode_results["time"] = time.time() - episode_start_time
         episode_results.update(planner.stat_tracker.get_episode())
+        episode_results.update(belief_tracker.get_episode())
         exp_params.write_episode_results(episode_results)
         episode_num += 1
 

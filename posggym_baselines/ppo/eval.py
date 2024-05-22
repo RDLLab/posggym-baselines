@@ -1,4 +1,5 @@
 """Functions for PPO population evaluation."""
+
 import math
 import time
 from itertools import product
@@ -326,11 +327,11 @@ def render_policies(
 
     Arguments
     ---------
-    policies:
+    policies
         A list of dicts containing the policies to evaluate. List length must equal the
         number of agents in the environment. Each dict should map from "policy_id" to
         a PPOModel.
-    config:
+    config
         The PPO configuration.
     """
     # assert len(policies) == config.num_agents

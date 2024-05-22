@@ -1,9 +1,9 @@
 """Tests for planning.mcts.core."""
+
 import math
 
 import posggym
 import posggym.agents as pga
-
 from posggym_baselines.planning.config import MCTSConfig
 from posggym_baselines.planning.mcts import MCTS
 from posggym_baselines.planning.other_policy import RandomOtherAgentPolicy
@@ -18,7 +18,7 @@ def test_with_random_policies():
         c=math.sqrt(2),
         truncated=False,
         action_selection="ucb",
-        root_exploration_fraction=0.25,
+        pucb_exploration_fraction=0.25,
         known_bounds=None,
         step_limit=None,
         epsilon=0.92,  # depth_limit=2

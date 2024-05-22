@@ -1,11 +1,13 @@
 """Tests for planning.potmmcp.core."""
+
 import math
 
 import posggym
 import posggym.agents as pga
-from posggym_baselines.planning.config import MCTSConfig
-from posggym_baselines.planning.pomcp import POMCP
-from posggym_baselines.planning.search_policy import (
+
+from posggym_baselines.planning import (
+    POMCP,
+    MCTSConfig,
     RandomSearchPolicy,
     load_posggym_agents_search_policy,
 )
@@ -38,8 +40,8 @@ def test_with_random_search_policy(render_mode="human"):
         search_time_limit=0.1,
         c=math.sqrt(2),
         truncated=False,
-        action_selection="pucb",
-        root_exploration_fraction=0.25,
+        action_selection="ucb",
+        pucb_exploration_fraction=0.25,
         known_bounds=None,
         step_limit=None,
         epsilon=0.92,  # depth_limit=2
@@ -80,7 +82,7 @@ def test_with_pga_search_policy(render_mode="human"):
         c=math.sqrt(2),
         truncated=False,
         action_selection="pucb",
-        root_exploration_fraction=0.25,
+        pucb_exploration_fraction=0.25,
         known_bounds=None,
         step_limit=None,
         epsilon=0.92,  # depth_limit=2

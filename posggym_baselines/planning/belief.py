@@ -5,6 +5,7 @@ import posggym.model as M
 from posggym.agents.policy import PolicyState
 from posggym.utils.history import JointHistory
 
+
 ParticleType = TypeVar("ParticleType")
 
 
@@ -79,11 +80,12 @@ class BeliefRejectionSampler:
         self,
         model: M.POSGModel,
         state_belief_only: bool = False,
-        sample_limit: int = 1000,
+        sample_limit_factor: float = 4,
     ):
+        assert sample_limit_factor >= 1
         self._model = model
         self._state_belief_only = state_belief_only
-        self._sample_limit = sample_limit
+        self._sample_limit_factor = sample_limit_factor
 
     def reinvigorate(
         self,
@@ -152,20 +154,18 @@ class BeliefRejectionSampler:
         use_rejected_samples: bool,
     ) -> List[HistoryPolicyState]:
         sample_count = 0
-        retry_count = 0
+        num_attempts = 0
         rejected_samples = []
         samples = []
-
-        while sample_count < num_samples and retry_count < max(
-            num_samples, self._sample_limit
-        ):
+        sample_limit = self._sample_limit_factor * num_samples
+        while sample_count < num_samples and num_attempts < sample_limit:
+            num_attempts += 1
             hps = parent_belief.sample()
             joint_action = joint_action_fn(hps, action)
             joint_step = self._model.step(hps.state, joint_action)
             joint_obs = joint_step.observations
 
             if joint_obs[agent_id] != obs and not use_rejected_samples:
-                retry_count += 1
                 continue
 
             if self._state_belief_only:
@@ -184,10 +184,8 @@ class BeliefRejectionSampler:
             if joint_obs[agent_id] == obs:
                 samples.append(next_hps)
                 sample_count += 1
-            else:
-                if use_rejected_samples:
-                    rejected_samples.append(next_hps)
-                retry_count += 1
+            elif use_rejected_samples:
+                rejected_samples.append(next_hps)
 
         if sample_count < num_samples and use_rejected_samples:
             num_missing = num_samples - sample_count

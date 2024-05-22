@@ -58,7 +58,9 @@ class MCTS:
             self.step_limit = float("inf")
 
         self._reinvigorator = B.BeliefRejectionSampler(
-            model, config.state_belief_only, sample_limit=4 * self.config.num_particles
+            model,
+            config.state_belief_only,
+            sample_limit_factor=config.reinvigoration_sample_limit_factor,
         )
 
         if config.action_selection == "pucb":
@@ -473,15 +475,14 @@ class MCTS:
         next_policy_state = {}
         for i in self.model.possible_agents:
             if i == self.agent_id or i not in joint_action:
-                h_t = None
-            else:
-                h_t = self._update_policy_state(
-                    joint_action[i],
-                    joint_obs[i],
-                    self.other_agent_policies[i],
-                    pi_state[i],
-                )
-            next_policy_state[i] = h_t
+                continue
+
+            next_policy_state[i] = self._update_policy_state(
+                joint_action[i],
+                joint_obs[i],
+                self.other_agent_policies[i],
+                pi_state[i],
+            )
         return next_policy_state
 
     #######################################################

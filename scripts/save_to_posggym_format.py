@@ -1,13 +1,13 @@
 """Script for converting a saved model to the format used by POSGGym."""
+
 from __future__ import annotations
 
 import argparse
 import pickle
 from pathlib import Path
 
-import torch
-
 import posggym.agents as pga
+import torch
 
 
 def format_checkpoint(checkpoint):
@@ -38,7 +38,7 @@ def format_checkpoint_dir(checkpoint_dir: Path, output_dir: Path | None = None):
         output_dir = checkpoint_dir
 
     checkpoint_files = list(checkpoint_dir.glob("checkpoint*.pt"))
-    if not checkpoint_files:
+    if len(checkpoint_files) == 0:
         raise ValueError(f"No checkpoint files found in {checkpoint_dir}")
 
     # Sort by checkpoint number, and get latest one
@@ -74,15 +74,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "checkpoint_dir",
-        type=Path,
+        type=str,
         help="Directory containing checkpoint files",
     )
     parser.add_argument(
         "--output_dir",
-        type=Path,
+        type=str,
         default=None,
         help="Directory to save reformatted models too. Defaults to checkpoint_dir",
     )
     args = parser.parse_args()
-    print(type(args.checkpoint_dir))
-    format_checkpoint_dir(args.checkpoint_dir, args.output_dir)
+    format_checkpoint_dir(Path(args.checkpoint_dir), Path(args.output_dir))
