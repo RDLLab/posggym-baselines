@@ -34,7 +34,9 @@ class IPPOConfig(PPOConfig):
         env = self.env_creator_fn(self, 0, None)()
         self.num_agents = len(env.possible_agents)
 
-    def load_policies(self, device: Optional[torch.device]) -> Dict[str, PPOModel]:
+    def load_policies(
+        self, device: Optional[torch.device], checkpoint: Optional[int] = None
+    ) -> Dict[str, PPOModel]:
         num_actions = (
             self.act_space.n
             if isinstance(self.act_space, spaces.Discrete)
@@ -75,7 +77,9 @@ class IPPOConfig(PPOConfig):
 
         if self.load_dir is not None:
             print(f"Loading policies from {self.load_dir}")
-            return load_policies(self, self.load_dir, policies=policies)
+            return load_policies(
+                self, self.load_dir, checkpoint=checkpoint, policies=policies
+            )
 
         return policies
 

@@ -9,6 +9,7 @@ import posggym_baselines.ppo.utils as ppo_utils
 from posggym_baselines.ppo.config import PPOConfig
 import numpy as np
 from gymnasium import spaces
+import posggym.model as M
 
 
 def one_hot(x: np.ndarray, space: spaces.Space) -> torch.Tensor:
@@ -283,6 +284,10 @@ def run_rollout_worker(
                                 infos[agent_id]["episode"]["r"][env_vec_idx],
                                 infos[agent_id]["episode"]["l"][env_vec_idx],
                                 infos[agent_id]["episode"]["t"][env_vec_idx],
+                                1
+                                if infos[agent_id]["final_info"][env_vec_idx]["outcome"]
+                                == M.Outcome.WIN
+                                else 0,
                             )
                         )
 
@@ -305,6 +310,7 @@ def run_rollout_worker(
                 "max_episode_return": torch.max(stats[:, 0]),
                 "mean_episode_length": torch.mean(stats[:, 1]),
                 "mean_episode_time": torch.mean(stats[:, 2]),
+                "success_rate": torch.mean(stats[:, 3]),
             }
 
         # bootstrap value for final entry of batch if not done

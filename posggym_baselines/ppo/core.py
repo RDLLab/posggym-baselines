@@ -530,7 +530,7 @@ def load_policies(
     if not checkpoint:
         checkpoint_files = sorted(checkpoint_files, key=lambda x: x.name)
         checkpoint = int(checkpoint_files[-1].name.split("_")[1])
-        print(checkpoint)
+    print("checkpoint: ", checkpoint)
 
     policy_checkpoint_files = {}
     for f in checkpoint_files:
@@ -538,12 +538,12 @@ def load_policies(
         if tokens[1] != str(checkpoint):
             continue
         policy_id = "_".join(tokens[2:-1] + tokens[-1].split(".")[:1])
-        policy_checkpoint_files[policy_id] = save_dir / f
+        policy_checkpoint_files[policy_id] = f
 
     device = device or config.device
 
     if policies is None:
-        policies = config.load_policies(device=device)
+        policies = config.load_policies(device=device, checkpoint=checkpoint)
 
     for policy_id, policy in policies.items():
         checkpoint_file = policy_checkpoint_files[policy_id]

@@ -316,7 +316,11 @@ def get_dynamics(env):
 
 
 def render_policies(
-    policies: List[Dict[str, PPOModel]], num_episodes: int, env, config: "PPOConfig"
+    policies: List[Dict[str, PPOModel]],
+    num_episodes: int,
+    env,
+    config: "PPOConfig",
+    render: bool = False,
 ) -> Dict[str, np.ndarray]:
     """Render pairwise episodes of policy population.
 
@@ -329,14 +333,20 @@ def render_policies(
     config:
         The PPO configuration.
     """
-    assert len(policies) == config.num_agents
+    # assert len(policies) == config.num_agents
     num_envs, num_agents = 1, config.num_agents
     device = config.eval_device
     mass_results = {}
     friction_results = {}
     elasticity_results = {}
+    result = []
+    print(policies)
 
-    for policy_ids in product(*policies):
+    for num, policy_ids in enumerate(product(*policies)):
+        # if num != 2:
+        #     continue
+        # if policy_ids[0] == policy_ids[1]:
+        #     continue
         print(f"\nRendering policies: {policy_ids}")
         next_obs = (
             torch.tensor(env.reset()[0])
@@ -363,11 +373,14 @@ def render_policies(
         ep_returns = []
         ep_disc_returns = []
         data = None
+        succ_count = 0
+        unsucc_count = 0
 
         current_reward = []
 
         while num_dones.sum() < num_episodes:
-            # env.render()
+            if render:
+                env.render()
             if data is None:
                 data = deepcopy(get_dynamics(env.envs[0]))
 
@@ -410,6 +423,8 @@ def render_policies(
             per_env_return += rews
             timesteps = timesteps + 1
 
+            # print(timesteps)
+
             for env_idx, flag in enumerate(dones):
                 # If an episode in one of the environments ends
 
@@ -433,11 +448,29 @@ def render_policies(
                     friction_results[friction1] = succ1
                     elasticity_results[elasticity1] = succ1
 
+                    result.append(
+                        (
+                            (succ0, mass0, friction0, elasticity0),
+                            (succ1, mass1, friction1, elasticity1),
+                        )
+                    )
+
+                    if succ0:
+                        succ_count += 1
+                    else:
+                        unsucc_count += 1
+
+                    if succ1:
+                        succ_count += 1
+                    else:
+                        unsucc_count += 1
+
                     data = deepcopy(get_dynamics(env.envs[env_idx]))
                     # print(data)
 
                     timesteps[env_idx] = 0
                     num_dones[env_idx] += 1
+                    print(num_dones.sum())
                     ep_returns.append(per_env_return[env_idx].copy())
                     ep_disc_returns.append(per_env_disc_return[env_idx].copy())
                     per_env_return[env_idx] = 0
@@ -458,5 +491,6 @@ def render_policies(
                 f"- return = {mean_ep_returns[i]:.2f} +/-  {std_ep_returns[i]:.2f} "
                 f"- disc. return = {mean_ep_disc_returns[i]:.2f} "
                 f"+/- {std_ep_disc_returns[i]:.2f}"
+                f" success = {succ_count / (succ_count + unsucc_count) * 100}"
             )
-    return mass_results, friction_results, elasticity_results
+    return mass_results, friction_results, elasticity_results, result

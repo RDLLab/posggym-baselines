@@ -43,7 +43,7 @@ def format_checkpoint_dir(checkpoint_dir: Path, output_dir: Path | None = None):
 
     # Sort by checkpoint number, and get latest one
     checkpoint_files = sorted(checkpoint_files, key=lambda x: x.name)
-    checkpoint_num = int(checkpoint_files.name[-1].split("_")[1])
+    checkpoint_num = int(checkpoint_files[-1].name.split("_")[1])
 
     policy_checkpoint_files = {}
     for f in checkpoint_files:
@@ -53,6 +53,10 @@ def format_checkpoint_dir(checkpoint_dir: Path, output_dir: Path | None = None):
         policy_id = "_".join(tokens[2:-1] + tokens[-1].split(".")[:1])
         policy_checkpoint_files[policy_id] = f
 
+    if not output_dir.exists():
+        output_dir.mkdir(exist_ok=True, parents=True)
+
+    assert output_dir.is_dir()
     for policy_id, checkpoint_file in policy_checkpoint_files.items():
         save_path = output_dir / f"{policy_id}.pkl"
 
@@ -63,7 +67,7 @@ def format_checkpoint_dir(checkpoint_dir: Path, output_dir: Path | None = None):
 
         print(f"{policy_id} done")
 
-    print(f"All done - saved to {checkpoint_dir}")
+    print(f"All done - saved to {output_dir}")
 
 
 if __name__ == "__main__":
@@ -80,4 +84,5 @@ if __name__ == "__main__":
         help="Directory to save reformatted models too. Defaults to checkpoint_dir",
     )
     args = parser.parse_args()
+    print(type(args.checkpoint_dir))
     format_checkpoint_dir(args.checkpoint_dir, args.output_dir)

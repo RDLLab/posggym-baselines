@@ -16,6 +16,8 @@ import typer
 from enum import Enum
 from pathlib import Path
 import re
+import functools
+from matplotlib import pyplot as plt
 
 app = typer.Typer()
 
@@ -38,7 +40,10 @@ class Algs(str, Enum):
 
 
 def get_env_creator_fn(
-    config: PPOConfig, env_idx: int, worker_idx: Optional[int] = None
+    config: PPOConfig,
+    env_idx: int,
+    worker_idx: Optional[int] = None,
+    n_actions: int = 4,
 ) -> Callable:
     """Get function for creating the environment."""
 
@@ -52,7 +57,7 @@ def get_env_creator_fn(
         if all(
             isinstance(env.action_spaces[key], spaces.Box) for key in env.action_spaces
         ):
-            env = DiscretizeActions(env, 4, False)
+            env = DiscretizeActions(env, n_actions, False)
 
         # seed = random.random
         seed = config.seed + env_idx
@@ -89,7 +94,10 @@ def train(
     total_timesteps: Annotated[int, typer.Option()] = int(3.2e6),
     num_workers: Annotated[int, typer.Option()] = 2,
     use_lstm: Annotated[bool, typer.Option()] = True,
+    checkpoint: Annotated[Optional[int], typer.Option()] = None,
     log_dir: Annotated[Path, typer.Option()] = Path("."),
+    load_dir: Annotated[Optional[Path], typer.Option()] = None,
+    n_actions: Annotated[int, typer.Option()] = 4,
 ):
     d = deepcopy(locals())
 
@@ -110,7 +118,9 @@ def train(
     config_kwargs.update(
         {
             "exp_name": f"{pop_training_alg.value}_{full_env_id.value}_N{pop_size}",
-            "env_creator_fn": get_env_creator_fn,
+            "env_creator_fn": functools.partial(
+                get_env_creator_fn, n_actions=n_actions
+            ),
             "env_id": env_kwargs["env_id"],
             "env_kwargs": env_kwargs["env_kwargs"],
         }
@@ -127,6 +137,8 @@ def train(
     for arg in ctx.args:
         pattern = r"--(\w+)=(\w+)"
         matches = re.match(pattern, arg)
+        # print(arg, matches)
+
         if matches:
             key = matches.group(1)
             value = matches.group(2)
@@ -136,7 +148,7 @@ def train(
             elif key in config_kwargs:
                 original_type = type(config_kwargs[key])
                 config_kwargs[key] = original_type(value)
-
+    # return
     if pop_training_alg.value.startswith("KLR"):
         if pop_training_alg == Algs.KLR_BR:
             include_BR = True
@@ -165,15 +177,60 @@ def train(
             filter_experience=True,
             **config_kwargs,
         )
+    if load_dir is not None:
+        print("checkpoint=", checkpoint)
+        p = load_policies(
+            config, checkpoint=checkpoint, save_dir=load_dir, device=config.eval_device
+        )
 
-    p = load_policies(config, save_dir=Path("."), device=config.eval_device)
     env = config.load_vec_env(1)
-    mass_results, friction_results, elasticity_results = render_policies(
-        [p, p], 100, env, config
+    mass_results, friction_results, elasticity_results, result = render_policies(
+        [p, p], 1000, env, config, render=False
     )
+    p1, p2 = list(zip(*result))
+
+    # Separate data into true and false categories
+    true_data = [point[1:] for point in p1 if point[0]]
+    false_data = [point[1:] for point in p1 if not point[0]]
+
+    # Plot the data points
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection="3d")
+
+    import pdb
+
+    pdb.set_trace()
+
+    # True data points in green
+    for point in true_data:
+        ax.scatter(point[0], point[1], point[2], color="green")
+
+    # False data points in red
+    for point in false_data:
+        ax.scatter(point[0], point[1], point[2], color="red")
+
+    # Setting labels
+    ax.set_xlabel("Mass")
+    ax.set_ylabel("Friction")
+    ax.set_zlabel("Elasticitiy")
+    with open("out_of_distribution.txt", "w") as f:
+        for x, y in result:
+            f.write(str(x) + "," + str(y))
+
+    plt.show()
+
+    # import pdb; pdb.set_trace()
     # print(x)
-    print("anc")
+    # print("anc")
 
 
 if __name__ == "__main__":
     app()
+    # command = typer.main.get_command(app)
+    # import sys
+
+    # try:
+    #    result = command(standalone_mode=False)
+    #    sys.exit(result)
+    # except:
+    #    print(f'exception was thrown')
