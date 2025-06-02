@@ -1,5 +1,6 @@
 """Tests for planning.potmmcp.core."""
 
+import argparse
 import math
 
 import posggym
@@ -32,7 +33,7 @@ def run_policies(env, planner, other_policy, planning_agent_id, other_agent_id):
     other_policy.close()
 
 
-def test_with_single_random_policies():
+def test_with_single_random_policies(render_mode: str = "human"):
     """Test POMMCP with random policies."""
     config = MCTSConfig(
         discount=0.95,
@@ -53,7 +54,7 @@ def test_with_single_random_policies():
         grid="14x14RoundAbout",
         num_agents=2,
         obs_dim=(3, 1, 1),
-        render_mode="human",
+        render_mode=render_mode,
     )
 
     planning_agent_id = env.possible_agents[0]
@@ -83,7 +84,7 @@ def test_with_single_random_policies():
     run_policies(env, planner, true_other_policy, planning_agent_id, other_agent_id)
 
 
-def test_with_other_policies_and_random_meta_policy():
+def test_with_other_policies_and_random_meta_policy(render_mode: str = "human"):
     """Test POMMCP with random policies."""
     config = MCTSConfig(
         discount=0.95,
@@ -104,7 +105,7 @@ def test_with_other_policies_and_random_meta_policy():
         grid="14x14RoundAbout",
         num_agents=2,
         obs_dim=(3, 1, 1),
-        render_mode="human",
+        render_mode=render_mode,
     )
 
     planning_agent_id = env.possible_agents[0]
@@ -140,7 +141,7 @@ def test_with_other_policies_and_random_meta_policy():
     run_policies(env, planner, true_other_policy, planning_agent_id, other_agent_id)
 
 
-def test_with_other_policies_and_uniform_meta_policy():
+def test_with_other_policies_and_uniform_meta_policy(render_mode: str = "human"):
     """Test POMMCP with random policies."""
     config = MCTSConfig(
         discount=0.95,
@@ -161,7 +162,7 @@ def test_with_other_policies_and_uniform_meta_policy():
         grid="14x14RoundAbout",
         num_agents=2,
         obs_dim=(3, 1, 1),
-        render_mode="human",
+        render_mode=render_mode,
     )
 
     planning_agent_id = env.possible_agents[0]
@@ -203,7 +204,7 @@ def test_with_other_policies_and_uniform_meta_policy():
     run_policies(env, planner, true_other_policy, planning_agent_id, other_agent_id)
 
 
-def test_with_torch_other_and_meta_policies():
+def test_with_torch_other_and_meta_policies(render_mode: str = "human"):
     """Test POMMCP with random policies."""
     config = MCTSConfig(
         discount=0.95,
@@ -224,7 +225,7 @@ def test_with_torch_other_and_meta_policies():
         grid="14x14RoundAbout",
         num_agents=2,
         obs_dim=(3, 1, 1),
-        render_mode="human",
+        render_mode=render_mode,
     )
 
     planning_agent_id = env.possible_agents[0]
@@ -267,7 +268,19 @@ def test_with_torch_other_and_meta_policies():
 
 
 if __name__ == "__main__":
-    test_with_single_random_policies()
-    test_with_other_policies_and_random_meta_policy()
-    test_with_other_policies_and_uniform_meta_policy()
-    test_with_torch_other_and_meta_policies()
+    parser = argparse.ArgumentParser(
+        description="Run POTMMCP tests with specified render mode."
+    )
+    parser.add_argument(
+        "--render-mode",
+        type=str,
+        default=None,
+        choices=["human", "ansi", "rgb_array"],
+        help="Render mode to use for environment (default: None)",
+    )
+    args = parser.parse_args()
+
+    test_with_single_random_policies(args.render_mode)
+    test_with_other_policies_and_random_meta_policy(args.render_mode)
+    test_with_other_policies_and_uniform_meta_policy(args.render_mode)
+    test_with_torch_other_and_meta_policies(args.render_mode)

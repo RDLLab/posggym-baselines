@@ -122,7 +122,7 @@ def test_with_pga_search_policy(render_mode="human", nesting_level=1):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Run PPO tests with specified render mode."
+        description="Run INTMCP tests with specified render mode."
     )
     parser.add_argument(
         "--render-mode",
