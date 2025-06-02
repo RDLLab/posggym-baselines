@@ -68,7 +68,7 @@ DEFAULT_PPO_CONFIG = {
     "wandb_entity": None,
     "wandb_group": None,
     "load_dir": None,
-    "save_interval": 100,
+    "save_interval": -1,
     # env config
     "capture_video": False,
     # eval configuration

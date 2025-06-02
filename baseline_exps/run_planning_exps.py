@@ -96,9 +96,8 @@ def get_intmcp_exp_params(
         belief_stats_to_track = ["state", "history"]
 
     all_exp_params = []
-    exp_num = 0
-    for planning_pop_id, test_pop_id, search_time in itertools.product(
-        ["P0", "P1"], ["P0", "P1"], args.search_times
+    for exp_num, (planning_pop_id, test_pop_id, search_time) in enumerate(
+        itertools.product(["P0", "P1"], ["P0", "P1"], args.search_times)
     ):
         exp_params = PlanningExpParams(
             env_kwargs=env_data.env_kwargs,
@@ -123,7 +122,6 @@ def get_intmcp_exp_params(
             track_per_step_belief_stats=args.track_per_step_belief_stats,
         )
         all_exp_params.append(exp_params)
-        exp_num += 1
 
     return all_exp_params
 
@@ -158,9 +156,8 @@ def get_ipomcp_exp_params(
 
     # generate all experiment parameters
     all_exp_params = []
-    exp_num = 0
-    for planning_pop_id, test_pop_id, search_time in itertools.product(
-        ["P0", "P1"], ["P0", "P1"], args.search_times
+    for exp_num, (planning_pop_id, test_pop_id, search_time) in enumerate(
+        itertools.product(["P0", "P1"], ["P0", "P1"], args.search_times)
     ):
         exp_params = PlanningExpParams(
             env_kwargs=env_data.env_kwargs,
@@ -189,7 +186,6 @@ def get_ipomcp_exp_params(
             track_per_step_belief_stats=args.track_per_step_belief_stats,
         )
         all_exp_params.append(exp_params)
-        exp_num += 1
     return all_exp_params
 
 
@@ -217,9 +213,8 @@ def get_pomcp_exp_params(
 
     # generate all experiment parameters
     all_exp_params = []
-    exp_num = 0
-    for planning_pop_id, test_pop_id, search_time in itertools.product(
-        ["P0", "P1"], ["P0", "P1"], args.search_times
+    for exp_num, (planning_pop_id, test_pop_id, search_time) in enumerate(
+        itertools.product(["P0", "P1"], ["P0", "P1"], args.search_times)
     ):
         exp_params = PlanningExpParams(
             env_kwargs=env_data.env_kwargs,
@@ -242,7 +237,6 @@ def get_pomcp_exp_params(
             track_per_step_belief_stats=args.track_per_step_belief_stats,
         )
         all_exp_params.append(exp_params)
-        exp_num += 1
 
     return all_exp_params
 
@@ -275,9 +269,8 @@ def get_potmmcp_exp_params(
         belief_stats_to_track = ["state", "history", "action", "policy"]
 
     all_exp_params = []
-    exp_num = 0
-    for planning_pop_id, test_pop_id, search_time in itertools.product(
-        ["P0", "P1"], ["P0", "P1"], args.search_times
+    for exp_num, (planning_pop_id, test_pop_id, search_time) in enumerate(
+        itertools.product(["P0", "P1"], ["P0", "P1"], args.search_times)
     ):
         exp_params = PlanningExpParams(
             env_kwargs=env_data.env_kwargs,
@@ -312,7 +305,6 @@ def get_potmmcp_exp_params(
             track_per_step_belief_stats=args.track_per_step_belief_stats,
         )
         all_exp_params.append(exp_params)
-        exp_num += 1
 
     return all_exp_params
 

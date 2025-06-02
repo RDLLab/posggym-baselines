@@ -62,7 +62,7 @@ class PPOConfig:
     # Whether to log to wandb or not
     track_wandb: bool = False
     # wandb project name
-    wandb_project: str = "posggym_dynamics"
+    wandb_project: str = "posggym_baselines"
     # wandb entity name
     wandb_entity: Optional[str] = None
     # wandb group name

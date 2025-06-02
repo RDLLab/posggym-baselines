@@ -109,9 +109,10 @@ def get_combined_exp_params(
 
     # generate all experiment parameters
     all_exp_params = []
-    exp_num = 0
-    for planning_pop_id, test_pop_id, search_time, rl_seed in itertools.product(
-        ["P0", "P1"], ["P0", "P1"], search_times, range(NUM_RL_POLICY_SEEDS)
+    for exp_num, (planning_pop_id, test_pop_id, search_time, rl_seed) in enumerate(
+        itertools.product(
+            ["P0", "P1"], ["P0", "P1"], search_times, range(NUM_RL_POLICY_SEEDS)
+        )
     ):
         exp_params = CombinedExpParams(
             env_kwargs=env_data.env_kwargs,
@@ -143,7 +144,6 @@ def get_combined_exp_params(
             track_per_step_belief_stats=track_per_step_belief_stats,
         )
         all_exp_params.append(exp_params)
-        exp_num += 1
     return all_exp_params
 
 

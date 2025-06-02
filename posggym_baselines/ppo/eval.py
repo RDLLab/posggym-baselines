@@ -10,7 +10,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.multiprocessing as mp
-from copy import deepcopy
 from posggym_baselines.ppo.network import PPOModel
 
 
@@ -299,23 +298,6 @@ def run_train_distribution_evaluation(
     return pw_returns
 
 
-def get_dynamics(env):
-    body0, shape0 = env.unwrapped.model.world.entities["vehicle_0"]
-
-    mass0 = body0.mass
-    friction0 = shape0.friction
-    elasticity0 = shape0.elasticity
-    # succ0, succ1 = terms
-
-    body1, shape1 = env.unwrapped.model.world.entities["vehicle_1"]
-
-    mass1 = body1.mass
-    friction1 = shape1.friction
-    elasticity1 = shape1.elasticity
-
-    return (mass0, friction0, elasticity0), (mass1, friction1, elasticity1)
-
-
 def render_policies(
     policies: List[Dict[str, PPOModel]],
     num_episodes: int,
@@ -337,17 +319,8 @@ def render_policies(
     # assert len(policies) == config.num_agents
     num_envs, num_agents = 1, config.num_agents
     device = config.eval_device
-    mass_results = {}
-    friction_results = {}
-    elasticity_results = {}
-    result = []
-    print(policies)
 
     for num, policy_ids in enumerate(product(*policies)):
-        # if num != 2:
-        #     continue
-        # if policy_ids[0] == policy_ids[1]:
-        #     continue
         print(f"\nRendering policies: {policy_ids}")
         next_obs = (
             torch.tensor(env.reset()[0])
@@ -373,18 +346,12 @@ def render_policies(
         timesteps = np.zeros((num_envs, 1))
         ep_returns = []
         ep_disc_returns = []
-        data = None
         succ_count = 0
         unsucc_count = 0
 
         current_reward = []
 
         while num_dones.sum() < num_episodes:
-            if render:
-                env.render()
-            if data is None:
-                data = deepcopy(get_dynamics(env.envs[0]))
-
             with torch.no_grad():
                 for i, policy_id in enumerate(policy_ids):
                     policy = policies[i][policy_id]
@@ -428,47 +395,7 @@ def render_policies(
 
             for env_idx, flag in enumerate(dones):
                 # If an episode in one of the environments ends
-
                 if flag:
-                    (mass0, friction0, elasticity0), (
-                        mass1,
-                        friction1,
-                        elasticity1,
-                    ) = data
-                    # env.
-                    # succ0, succ1 = terms
-
-                    succ0 = np.array(current_reward).squeeze()[:, 0].max() >= 1
-                    succ1 = np.array(current_reward).squeeze()[:, 1].max() >= 1
-
-                    mass_results[mass0] = succ0
-                    friction_results[friction0] = succ0
-                    elasticity_results[elasticity0] = succ0
-
-                    mass_results[mass1] = succ1
-                    friction_results[friction1] = succ1
-                    elasticity_results[elasticity1] = succ1
-
-                    result.append(
-                        (
-                            (succ0, mass0, friction0, elasticity0),
-                            (succ1, mass1, friction1, elasticity1),
-                        )
-                    )
-
-                    if succ0:
-                        succ_count += 1
-                    else:
-                        unsucc_count += 1
-
-                    if succ1:
-                        succ_count += 1
-                    else:
-                        unsucc_count += 1
-
-                    data = deepcopy(get_dynamics(env.envs[env_idx]))
-                    # print(data)
-
                     timesteps[env_idx] = 0
                     num_dones[env_idx] += 1
                     print(num_dones.sum())
@@ -494,4 +421,3 @@ def render_policies(
                 f"+/- {std_ep_disc_returns[i]:.2f}"
                 f" success = {succ_count / (succ_count + unsucc_count) * 100}"
             )
-    return mass_results, friction_results, elasticity_results, result
