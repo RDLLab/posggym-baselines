@@ -316,7 +316,7 @@ def render_policies(
     config
         The PPO configuration.
     """
-    # assert len(policies) == config.num_agents
+    assert len(policies) == config.num_agents
     num_envs, num_agents = 1, config.num_agents
     device = config.eval_device
 
@@ -346,12 +346,9 @@ def render_policies(
         timesteps = np.zeros((num_envs, 1))
         ep_returns = []
         ep_disc_returns = []
-        succ_count = 0
-        unsucc_count = 0
-
-        current_reward = []
 
         while num_dones.sum() < num_episodes:
+            env.render()
             with torch.no_grad():
                 for i, policy_id in enumerate(policy_ids):
                     policy = policies[i][policy_id]
@@ -385,32 +382,26 @@ def render_policies(
             )
 
             rews = rews.reshape((num_envs, num_agents))
-            current_reward.append(rews)
 
             per_env_disc_return += config.gamma**timesteps * rews
             per_env_return += rews
             timesteps = timesteps + 1
-
-            # print(timesteps)
 
             for env_idx, flag in enumerate(dones):
                 # If an episode in one of the environments ends
                 if flag:
                     timesteps[env_idx] = 0
                     num_dones[env_idx] += 1
-                    print(num_dones.sum())
                     ep_returns.append(per_env_return[env_idx].copy())
                     ep_disc_returns.append(per_env_disc_return[env_idx].copy())
                     per_env_return[env_idx] = 0
                     per_env_disc_return[env_idx] = 0
-                    current_reward = []
 
         mean_ep_returns = np.mean(ep_returns, axis=0)
         std_ep_returns = np.std(ep_returns, axis=0)
 
         mean_ep_disc_returns = np.mean(ep_disc_returns, axis=0)
         std_ep_disc_returns = np.std(ep_disc_returns, axis=0)
-        # env.close()
 
         print(f"policy_ids={policy_ids}")
         for i, policy_id in enumerate(policy_ids):
@@ -419,5 +410,4 @@ def render_policies(
                 f"- return = {mean_ep_returns[i]:.2f} +/-  {std_ep_returns[i]:.2f} "
                 f"- disc. return = {mean_ep_disc_returns[i]:.2f} "
                 f"+/- {std_ep_disc_returns[i]:.2f}"
-                f" success = {succ_count / (succ_count + unsucc_count) * 100}"
             )
