@@ -42,6 +42,7 @@ dependencies = [
     "seaborn >=0.12.2",
     "psutil >=5.9.0",
     "gymnasium ==0.29.1",
+    "typer",
 ]
 dynamic = ["version"]
 

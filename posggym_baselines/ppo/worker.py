@@ -82,6 +82,8 @@ def run_rollout_worker(  # noqa: PLR0915, PLR0912
     if config.use_previous_action:
         obs_buf_shape = obs_buf_shape[:-1] + (obs_buf_shape[-1] + one_hot_size,)
     obs_buf = torch.zeros(obs_buf_shape).to(device)
+    # import pdb; pdb.set_trace()
+    print(buf_shape, config.act_space.shape)
     actions_buf = torch.zeros(
         (*buf_shape,) if config.act_space.shape is None else config.act_space.shape
     ).to(device)
@@ -224,7 +226,7 @@ def run_rollout_worker(  # noqa: PLR0915, PLR0912
                     next_lstm_state[0][:, idxs, :] = lstm_i[0]
                     next_lstm_state[1][:, idxs, :] = lstm_i[1]
                 next_action[idxs] = actions_i
-
+            print(next_action.shape, step, actions_buf.shape)
             actions_buf[step] = next_action
             logprobs_buf[step] = next_logprobs
             values_buf[step] = next_values

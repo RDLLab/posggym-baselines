@@ -1,0 +1,188 @@
+P0:
+  greedy:
+    Driving-v1/A0Shortestpath-v0:
+      Driving-v1/A0Shortestpath-v0: 0.0
+      Driving-v1/A100Shortestpath-v0: 1.0
+      Driving-v1/A40Shortestpath-v0: 0.0
+      Driving-v1/A60Shortestpath-v0: 0.0
+      Driving-v1/A80Shortestpath-v0: 0.0
+    Driving-v1/A100Shortestpath-v0:
+      Driving-v1/A0Shortestpath-v0: 0.0
+      Driving-v1/A100Shortestpath-v0: 0.0
+      Driving-v1/A40Shortestpath-v0: 1.0
+      Driving-v1/A60Shortestpath-v0: 0.0
+      Driving-v1/A80Shortestpath-v0: 0.0
+    Driving-v1/A40Shortestpath-v0:
+      Driving-v1/A0Shortestpath-v0: 0.0
+      Driving-v1/A100Shortestpath-v0: 1.0
+      Driving-v1/A40Shortestpath-v0: 0.0
+      Driving-v1/A60Shortestpath-v0: 0.0
+      Driving-v1/A80Shortestpath-v0: 0.0
+    Driving-v1/A60Shortestpath-v0:
+      Driving-v1/A0Shortestpath-v0: 0.0
+      Driving-v1/A100Shortestpath-v0: 0.0
+      Driving-v1/A40Shortestpath-v0: 0.0
+      Driving-v1/A60Shortestpath-v0: 0.0
+      Driving-v1/A80Shortestpath-v0: 1.0
+    Driving-v1/A80Shortestpath-v0:
+      Driving-v1/A0Shortestpath-v0: 0.0
+      Driving-v1/A100Shortestpath-v0: 0.0
+      Driving-v1/A40Shortestpath-v0: 1.0
+      Driving-v1/A60Shortestpath-v0: 0.0
+      Driving-v1/A80Shortestpath-v0: 0.0
+  softmax:
+    Driving-v1/A0Shortestpath-v0:
+      Driving-v1/A0Shortestpath-v0: 0.152072741751754
+      Driving-v1/A100Shortestpath-v0: 0.42505317387205055
+      Driving-v1/A40Shortestpath-v0: 0.1054400860239937
+      Driving-v1/A60Shortestpath-v0: 0.1364034630617465
+      Driving-v1/A80Shortestpath-v0: 0.1810305352904554
+    Driving-v1/A100Shortestpath-v0:
+      Driving-v1/A0Shortestpath-v0: 0.24638730341673595
+      Driving-v1/A100Shortestpath-v0: 0.08080556517749536
+      Driving-v1/A40Shortestpath-v0: 0.40699423322905603
+      Driving-v1/A60Shortestpath-v0: 0.15999225492959276
+      Driving-v1/A80Shortestpath-v0: 0.10582064324711973
+    Driving-v1/A40Shortestpath-v0:
+      Driving-v1/A0Shortestpath-v0: 0.1462738198249478
+      Driving-v1/A100Shortestpath-v0: 0.3675059542280589
+      Driving-v1/A40Shortestpath-v0: 0.13865107984793784
+      Driving-v1/A60Shortestpath-v0: 0.1079495705209893
+      Driving-v1/A80Shortestpath-v0: 0.23961957557806612
+    Driving-v1/A60Shortestpath-v0:
+      Driving-v1/A0Shortestpath-v0: 0.137071795457628
+      Driving-v1/A100Shortestpath-v0: 0.24592628137446432
+      Driving-v1/A40Shortestpath-v0: 0.16662375693487436
+      Driving-v1/A60Shortestpath-v0: 0.1983397163964693
+      Driving-v1/A80Shortestpath-v0: 0.252038449836564
+    Driving-v1/A80Shortestpath-v0:
+      Driving-v1/A0Shortestpath-v0: 0.2054031130563712
+      Driving-v1/A100Shortestpath-v0: 0.1399165363677089
+      Driving-v1/A40Shortestpath-v0: 0.34523583124222845
+      Driving-v1/A60Shortestpath-v0: 0.12462359394072646
+      Driving-v1/A80Shortestpath-v0: 0.184820925392965
+  uniform:
+    Driving-v1/A0Shortestpath-v0:
+      Driving-v1/A0Shortestpath-v0: 0.2
+      Driving-v1/A100Shortestpath-v0: 0.2
+      Driving-v1/A40Shortestpath-v0: 0.2
+      Driving-v1/A60Shortestpath-v0: 0.2
+      Driving-v1/A80Shortestpath-v0: 0.2
+    Driving-v1/A100Shortestpath-v0:
+      Driving-v1/A0Shortestpath-v0: 0.2
+      Driving-v1/A100Shortestpath-v0: 0.2
+      Driving-v1/A40Shortestpath-v0: 0.2
+      Driving-v1/A60Shortestpath-v0: 0.2
+      Driving-v1/A80Shortestpath-v0: 0.2
+    Driving-v1/A40Shortestpath-v0:
+      Driving-v1/A0Shortestpath-v0: 0.2
+      Driving-v1/A100Shortestpath-v0: 0.2
+      Driving-v1/A40Shortestpath-v0: 0.2
+      Driving-v1/A60Shortestpath-v0: 0.2
+      Driving-v1/A80Shortestpath-v0: 0.2
+    Driving-v1/A60Shortestpath-v0:
+      Driving-v1/A0Shortestpath-v0: 0.2
+      Driving-v1/A100Shortestpath-v0: 0.2
+      Driving-v1/A40Shortestpath-v0: 0.2
+      Driving-v1/A60Shortestpath-v0: 0.2
+      Driving-v1/A80Shortestpath-v0: 0.2
+    Driving-v1/A80Shortestpath-v0:
+      Driving-v1/A0Shortestpath-v0: 0.2
+      Driving-v1/A100Shortestpath-v0: 0.2
+      Driving-v1/A40Shortestpath-v0: 0.2
+      Driving-v1/A60Shortestpath-v0: 0.2
+      Driving-v1/A80Shortestpath-v0: 0.2
+P1:
+  greedy:
+    Driving-v1/grid=14x14RoundAbout-num_agents=2/RL1-v0:
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL1-v0: 0.0
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL2-v0: 0.0
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL3-v0: 1.0
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL4-v0: 0.0
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL5-v0: 0.0
+    Driving-v1/grid=14x14RoundAbout-num_agents=2/RL2-v0:
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL1-v0: 0.5
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL2-v0: 0.5
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL3-v0: 0.0
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL4-v0: 0.0
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL5-v0: 0.0
+    Driving-v1/grid=14x14RoundAbout-num_agents=2/RL3-v0:
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL1-v0: 0.0
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL2-v0: 0.0
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL3-v0: 1.0
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL4-v0: 0.0
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL5-v0: 0.0
+    Driving-v1/grid=14x14RoundAbout-num_agents=2/RL4-v0:
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL1-v0: 0.0
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL2-v0: 0.0
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL3-v0: 1.0
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL4-v0: 0.0
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL5-v0: 0.0
+    Driving-v1/grid=14x14RoundAbout-num_agents=2/RL5-v0:
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL1-v0: 0.0
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL2-v0: 1.0
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL3-v0: 0.0
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL4-v0: 0.0
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL5-v0: 0.0
+  softmax:
+    Driving-v1/grid=14x14RoundAbout-num_agents=2/RL1-v0:
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL1-v0: 0.20714752090137545
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL2-v0: 0.24991228309678382
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL3-v0: 0.25018506344056973
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL4-v0: 0.21107798315864656
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL5-v0: 0.08167714940262451
+    Driving-v1/grid=14x14RoundAbout-num_agents=2/RL2-v0:
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL1-v0: 0.30248232819499243
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL2-v0: 0.30248232819499243
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL3-v0: 0.11303020973321184
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL4-v0: 0.23174870715358364
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL5-v0: 0.050256426723219824
+    Driving-v1/grid=14x14RoundAbout-num_agents=2/RL3-v0:
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL1-v0: 0.2879931686593642
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL2-v0: 0.10773366179015367
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL3-v0: 0.30645607731603636
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL4-v0: 0.2458680362283407
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL5-v0: 0.051949056006105096
+    Driving-v1/grid=14x14RoundAbout-num_agents=2/RL4-v0:
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL1-v0: 0.24888230170964232
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL2-v0: 0.20154266175356803
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL3-v0: 0.2502538375621287
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL4-v0: 0.24263364599380172
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL5-v0: 0.05668755298085938
+    Driving-v1/grid=14x14RoundAbout-num_agents=2/RL5-v0:
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL1-v0: 0.28733621787863867
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL2-v0: 0.30078751344239396
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL3-v0: 0.15341452402753036
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL4-v0: 0.12333562394630357
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL5-v0: 0.13512612070513344
+  uniform:
+    Driving-v1/grid=14x14RoundAbout-num_agents=2/RL1-v0:
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL1-v0: 0.2
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL2-v0: 0.2
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL3-v0: 0.2
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL4-v0: 0.2
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL5-v0: 0.2
+    Driving-v1/grid=14x14RoundAbout-num_agents=2/RL2-v0:
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL1-v0: 0.2
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL2-v0: 0.2
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL3-v0: 0.2
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL4-v0: 0.2
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL5-v0: 0.2
+    Driving-v1/grid=14x14RoundAbout-num_agents=2/RL3-v0:
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL1-v0: 0.2
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL2-v0: 0.2
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL3-v0: 0.2
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL4-v0: 0.2
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL5-v0: 0.2
+    Driving-v1/grid=14x14RoundAbout-num_agents=2/RL4-v0:
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL1-v0: 0.2
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL2-v0: 0.2
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL3-v0: 0.2
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL4-v0: 0.2
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL5-v0: 0.2
+    Driving-v1/grid=14x14RoundAbout-num_agents=2/RL5-v0:
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL1-v0: 0.2
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL2-v0: 0.2
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL3-v0: 0.2
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL4-v0: 0.2
+      Driving-v1/grid=14x14RoundAbout-num_agents=2/RL5-v0: 0.2

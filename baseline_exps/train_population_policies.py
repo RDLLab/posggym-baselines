@@ -140,7 +140,8 @@ def train(
             "env_kwargs": env_kwargs["env_kwargs"],
         }
     )
-
+    print(config_kwargs, loaded_config)
+    import pdb; pdb.set_trace()
     config_kwargs = {**config_kwargs, **loaded_config}
 
     for k, v in d.items():
