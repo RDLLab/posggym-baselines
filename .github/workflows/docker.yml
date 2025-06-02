@@ -32,6 +32,6 @@ jobs:
           context: .
           file: Dockerfile
           push: true
-          tags: ghcr.io/${{ github.repository_owner.toLowerCase() }}/posggym-baselines:latest
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner.toLowerCase() }}/posggym-baselines:latest
-          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner.toLowerCase() }}/posggym-baselines:latest,mode=max
+          tags: ${{ format('ghcr.io/{0}/posggym-baselines:latest', github.repository_owner) | toLower }}
+          cache-from: type=registry,ref=${{ format('ghcr.io/{0}/posggym-baselines:latest', github.repository_owner) | toLower }}
+          cache-to: type=registry,ref=${{ format('ghcr.io/{0}/posggym-baselines:latest', github.repository_owner) | toLower }},mode=max
