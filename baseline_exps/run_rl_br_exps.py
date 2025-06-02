@@ -68,7 +68,7 @@ def run_evaluation_episodes(
 
     env = config.load_vec_env(num_envs=num_envs)
     next_obs = (
-        torch.tensor(env.reset()[0])
+        torch.Tensor(env.reset()[0])
         .float()
         .to(device)
         .reshape(num_envs, num_agents, -1)

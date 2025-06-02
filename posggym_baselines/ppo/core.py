@@ -3,7 +3,8 @@
 import contextlib
 import time
 from datetime import timedelta
-from multiprocessing.queues import Empty, Full
+from multiprocessing.queues import Empty, Full, JoinableQueue
+from multiprocessing.synchronize import Event
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -47,11 +48,11 @@ class PPOLearner:
 
     def train(
         self,
-        worker_recv_queues: list[mp.JoinableQueue],
-        worker_send_queues: list[mp.JoinableQueue],
-        eval_recv_queue: mp.JoinableQueue | None,
-        eval_send_queue: mp.JoinableQueue | None,
-        termination_event: mp.Event,
+        worker_recv_queues: list[JoinableQueue],
+        worker_send_queues: list[JoinableQueue],
+        eval_recv_queue: JoinableQueue | None,
+        eval_send_queue: JoinableQueue | None,
+        termination_event: Event,
     ):
         """Run PPO training.
 
@@ -221,7 +222,7 @@ class PPOLearner:
 
             update += 1
 
-    def update(self, batch: dict[str, torch.tensor], global_step: int):
+    def update(self, batch: dict[str, torch.Tensor], global_step: int):
         """Update the policies using the batch of experience."""
         # calculate advantages and monte-carlo returns
         rewards_buf, dones_buf, values_buf = (
@@ -425,9 +426,9 @@ class PPOLearner:
     def evaluate(
         self,
         global_step: int,
-        eval_recv_queue: mp.JoinableQueue,
-        eval_send_queue: mp.JoinableQueue,
-        termination_event: mp.Event,
+        eval_recv_queue: JoinableQueue,
+        eval_send_queue: JoinableQueue,
+        termination_event: Event,
         final_eval: bool,
     ):
         """Run evaluation of policies."""
@@ -553,11 +554,11 @@ def load_policies(
 
 def run_learner(
     config: "PPOConfig",
-    worker_recv_queues: list[mp.JoinableQueue],
-    worker_send_queues: list[mp.JoinableQueue],
-    eval_recv_queue: mp.JoinableQueue | None,
-    eval_send_queue: mp.JoinableQueue | None,
-    termination_event: mp.Event,
+    worker_recv_queues: list[JoinableQueue],
+    worker_send_queues: list[JoinableQueue],
+    eval_recv_queue: JoinableQueue | None,
+    eval_send_queue: JoinableQueue | None,
+    termination_event: Event,
 ):
     """Run PPO learner process.
 

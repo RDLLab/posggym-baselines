@@ -267,7 +267,7 @@ def test_with_torch_other_and_meta_policies():
 
 
 if __name__ == "__main__":
-    # test_with_single_random_policies()
-    # test_with_other_policies_and_random_meta_policy()
-    # test_with_other_policies_and_uniform_meta_policy()
+    test_with_single_random_policies()
+    test_with_other_policies_and_random_meta_policy()
+    test_with_other_policies_and_uniform_meta_policy()
     test_with_torch_other_and_meta_policies()

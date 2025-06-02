@@ -28,23 +28,23 @@ class UniformRandomModel(PPOModel):
 
     def get_value(
         self,
-        x: torch.tensor,
-        lstm_state: tuple[torch.tensor, torch.tensor] | None,
-        done: torch.tensor,
-    ) -> torch.tensor:
+        x: torch.Tensor,
+        lstm_state: tuple[torch.Tensor, torch.Tensor] | None,
+        done: torch.Tensor,
+    ) -> torch.Tensor:
         return torch.zeros((x.shape[0], 1))
 
     def get_action(
         self,
-        x: torch.tensor,
-        lstm_state: tuple[torch.tensor, torch.tensor] | None,
-        done: torch.tensor,
-        action: torch.tensor | None = None,
+        x: torch.Tensor,
+        lstm_state: tuple[torch.Tensor, torch.Tensor] | None,
+        done: torch.Tensor,
+        action: torch.Tensor | None = None,
     ) -> tuple[
-        torch.tensor,
-        torch.tensor,
-        torch.tensor,
-        tuple[torch.tensor, torch.tensor] | None,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        tuple[torch.Tensor, torch.Tensor] | None,
     ]:
         action_probs = self.action_probs.repeat(x.shape[0], 1)
         probs = Categorical(probs=action_probs)
@@ -59,16 +59,16 @@ class UniformRandomModel(PPOModel):
 
     def get_action_and_value(
         self,
-        x: torch.tensor,
-        lstm_state: tuple[torch.tensor, torch.tensor] | None,
-        done: torch.tensor,
-        action: torch.tensor | None = None,
+        x: torch.Tensor,
+        lstm_state: tuple[torch.Tensor, torch.Tensor] | None,
+        done: torch.Tensor,
+        action: torch.Tensor | None = None,
     ) -> tuple[
-        torch.tensor,
-        torch.tensor,
-        torch.tensor,
-        torch.tensor,
-        tuple[torch.tensor, torch.tensor] | None,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        tuple[torch.Tensor, torch.Tensor] | None,
     ]:
         action_probs = self.action_probs.repeat(x.shape[0], 1)
         probs = Categorical(probs=action_probs)

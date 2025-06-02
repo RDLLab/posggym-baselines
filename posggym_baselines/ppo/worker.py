@@ -255,7 +255,7 @@ def run_rollout_worker(  # noqa: PLR0915, PLR0912
             agent_dones = terminated | truncated
 
             rewards_buf[step] = (
-                torch.tensor(reward)
+                torch.Tensor(reward)
                 .reshape((config.num_envs, config.num_agents))
                 .to(config.worker_device)
             )
@@ -304,7 +304,7 @@ def run_rollout_worker(  # noqa: PLR0915, PLR0912
         for policy_id, stats in policy_episode_stats.items():
             if len(stats) == 0:
                 continue
-            stats = torch.tensor(stats, dtype=torch.float32)
+            stats = torch.Tensor(stats, dtype=torch.float32)
             policy_stats[policy_id] = {
                 "mean_episode_return": torch.mean(stats[:, 0]),
                 "min_episode_return": torch.min(stats[:, 0]),

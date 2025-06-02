@@ -21,10 +21,10 @@ class PPOModel(nn.Module):
 
     def get_value(
         self,
-        x: torch.tensor,
-        lstm_state: tuple[torch.tensor, torch.tensor] | None,
-        done: torch.tensor,
-    ) -> torch.tensor:
+        x: torch.Tensor,
+        lstm_state: tuple[torch.Tensor, torch.Tensor] | None,
+        done: torch.Tensor,
+    ) -> torch.Tensor:
         """Get the value from the critic.
 
         B = batch_size
@@ -53,15 +53,15 @@ class PPOModel(nn.Module):
 
     def get_action(
         self,
-        x: torch.tensor,
-        lstm_state: tuple[torch.tensor, torch.tensor] | None,
-        done: torch.tensor,
-        action: torch.tensor | None = None,
+        x: torch.Tensor,
+        lstm_state: tuple[torch.Tensor, torch.Tensor] | None,
+        done: torch.Tensor,
+        action: torch.Tensor | None = None,
     ) -> tuple[
-        torch.tensor,
-        torch.tensor,
-        torch.tensor,
-        tuple[torch.tensor, torch.tensor] | None,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        tuple[torch.Tensor, torch.Tensor] | None,
     ]:
         """Get action from the actor.
 
@@ -97,16 +97,16 @@ class PPOModel(nn.Module):
 
     def get_action_and_value(
         self,
-        x: torch.tensor,
-        lstm_state: tuple[torch.tensor, torch.tensor] | None,
-        done: torch.tensor,
-        action: torch.tensor | None = None,
+        x: torch.Tensor,
+        lstm_state: tuple[torch.Tensor, torch.Tensor] | None,
+        done: torch.Tensor,
+        action: torch.Tensor | None = None,
     ) -> tuple[
-        torch.tensor,
-        torch.tensor,
-        torch.tensor,
-        torch.tensor,
-        tuple[torch.tensor, torch.tensor] | None,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        tuple[torch.Tensor, torch.Tensor] | None,
     ]:
         """Get action from the actor and value from the critic.
 
@@ -216,10 +216,10 @@ class PPOLSTMModel(PPOModel):
 
     def get_states(
         self,
-        x: torch.tensor,
-        lstm_state: tuple[torch.tensor, torch.tensor],
-        done: torch.tensor,
-    ) -> tuple[torch.tensor, tuple[torch.tensor, torch.tensor]]:
+        x: torch.Tensor,
+        lstm_state: tuple[torch.Tensor, torch.Tensor],
+        done: torch.Tensor,
+    ) -> tuple[torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
         """Get the next states from the LSTM.
 
         B = batch_size (typically the number of parallel environments contained in the
@@ -276,25 +276,25 @@ class PPOLSTMModel(PPOModel):
 
     def get_value(
         self,
-        x: torch.tensor,
-        lstm_state: tuple[torch.tensor, torch.tensor] | None,
-        done: torch.tensor,
-    ) -> torch.tensor:
+        x: torch.Tensor,
+        lstm_state: tuple[torch.Tensor, torch.Tensor] | None,
+        done: torch.Tensor,
+    ) -> torch.Tensor:
         assert lstm_state is not None
         hidden, _ = self.get_states(x, lstm_state, done)
         return self.critic(hidden)
 
     def get_action(
         self,
-        x: torch.tensor,
-        lstm_state: tuple[torch.tensor, torch.tensor] | None,
-        done: torch.tensor,
-        action: torch.tensor | None = None,
+        x: torch.Tensor,
+        lstm_state: tuple[torch.Tensor, torch.Tensor] | None,
+        done: torch.Tensor,
+        action: torch.Tensor | None = None,
     ) -> tuple[
-        torch.tensor,
-        torch.tensor,
-        torch.tensor,
-        tuple[torch.tensor, torch.tensor] | None,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        tuple[torch.Tensor, torch.Tensor] | None,
     ]:
         assert lstm_state is not None
         hidden, lstm_state = self.get_states(x, lstm_state, done)
@@ -331,16 +331,16 @@ class PPOLSTMModel(PPOModel):
 
     def get_action_and_value(
         self,
-        x: torch.tensor,
-        lstm_state: tuple[torch.tensor, torch.tensor] | None,
-        done: torch.tensor,
-        action: torch.tensor | None = None,
+        x: torch.Tensor,
+        lstm_state: tuple[torch.Tensor, torch.Tensor] | None,
+        done: torch.Tensor,
+        action: torch.Tensor | None = None,
     ) -> tuple[
-        torch.tensor,
-        torch.tensor,
-        torch.tensor,
-        torch.tensor,
-        tuple[torch.tensor, torch.tensor] | None,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        tuple[torch.Tensor, torch.Tensor] | None,
     ]:
         assert lstm_state is not None
         hidden, lstm_state = self.get_states(x, lstm_state, done)
@@ -429,24 +429,24 @@ class PPOMLPModel(PPOModel):
 
     def get_value(
         self,
-        x: torch.tensor,
-        lstm_state: tuple[torch.tensor, torch.tensor] | None,
-        done: torch.tensor,
-    ) -> torch.tensor:
+        x: torch.Tensor,
+        lstm_state: tuple[torch.Tensor, torch.Tensor] | None,
+        done: torch.Tensor,
+    ) -> torch.Tensor:
         hidden = self.trunk(x)
         return self.critic(hidden)
 
     def get_action(
         self,
-        x: torch.tensor,
-        lstm_state: tuple[torch.tensor, torch.tensor] | None,
-        done: torch.tensor,
-        action: torch.tensor | None = None,
+        x: torch.Tensor,
+        lstm_state: tuple[torch.Tensor, torch.Tensor] | None,
+        done: torch.Tensor,
+        action: torch.Tensor | None = None,
     ) -> tuple[
-        torch.tensor,
-        torch.tensor,
-        torch.tensor,
-        tuple[torch.tensor, torch.tensor] | None,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        tuple[torch.Tensor, torch.Tensor] | None,
     ]:
         hidden = self.trunk(x)
         logits = self.actor(hidden)
@@ -462,16 +462,16 @@ class PPOMLPModel(PPOModel):
 
     def get_action_and_value(
         self,
-        x: torch.tensor,
-        lstm_state: tuple[torch.tensor, torch.tensor] | None,
-        done: torch.tensor,
-        action: torch.tensor | None = None,
+        x: torch.Tensor,
+        lstm_state: tuple[torch.Tensor, torch.Tensor] | None,
+        done: torch.Tensor,
+        action: torch.Tensor | None = None,
     ) -> tuple[
-        torch.tensor,
-        torch.tensor,
-        torch.tensor,
-        torch.tensor,
-        tuple[torch.tensor, torch.tensor] | None,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        tuple[torch.Tensor, torch.Tensor] | None,
     ]:
         hidden = self.trunk(x)
         logits = self.actor(hidden)

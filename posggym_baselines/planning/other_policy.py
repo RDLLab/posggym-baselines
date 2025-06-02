@@ -120,12 +120,12 @@ class OtherAgentPolicy(abc.ABC):
             state = self.get_next_state(a, o, state)
         return state
 
-    @abc.abstractmethod
     def close(self):
         """Close policy and perform any necessary cleanup.
 
         Should be overridden in subclasses as necessary.
         """
+        return
 
 
 class RandomOtherAgentPolicy(OtherAgentPolicy):

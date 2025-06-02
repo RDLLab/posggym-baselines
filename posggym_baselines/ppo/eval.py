@@ -156,7 +156,7 @@ def run_pairwise_evaluation(
 
         env = config.load_vec_env(num_envs=num_envs)
         next_obs = (
-            torch.tensor(env.reset()[0])
+            torch.Tensor(env.reset()[0])
             .float()
             .to(device)
             .reshape(num_envs, num_agents, -1)
@@ -325,7 +325,7 @@ def render_policies(
     for _num, policy_ids in enumerate(product(*policies)):
         print(f"\nRendering policies: {policy_ids}")
         next_obs = (
-            torch.tensor(env.reset()[0])
+            torch.Tensor(env.reset()[0])
             .float()
             .to(device)
             .reshape(num_envs, num_agents, -1)

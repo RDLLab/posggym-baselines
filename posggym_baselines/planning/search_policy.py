@@ -146,12 +146,12 @@ class SearchPolicy(abc.ABC):
             state = self.get_next_state(a, o, state)
         return state
 
-    @abc.abstractmethod
     def close(self):
         """Close policy and perform any necessary cleanup.
 
         Should be overridden in subclasses as necessary.
         """
+        return
 
 
 class RandomSearchPolicy(SearchPolicy):
@@ -258,11 +258,11 @@ class PPOLSTMSearchPolicy(SearchPolicy):
     ) -> PolicyState:
         obs = self.obs_processor(obs)
         if isinstance(obs, np.ndarray):
-            obs = torch.tensor(obs, dtype=torch.float32)
+            obs = torch.Tensor(obs, dtype=torch.float32)
 
         with torch.no_grad():
             hidden_state, lstm_state = self.policy_model.get_states(
-                obs, state["lstm_state"], done=torch.tensor([0])
+                obs, state["lstm_state"], done=torch.Tensor([0])
             )
             logits = self.policy_model.actor(hidden_state)
             probs = Categorical(logits=logits).probs.squeeze()
