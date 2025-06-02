@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 import posggym.model as M
 
 from posggym_baselines.planning.config import MCTSConfig
@@ -31,5 +33,5 @@ class POMCP(MCTS):
         }
         if not config.state_belief_only:
             # creates copy of config with state_belief_only=True
-            config = config.replace(state_belief_only=True)
+            config = replace(config, state_belief_only=True)
         super().__init__(model, agent_id, config, other_agent_policies, search_policy)
