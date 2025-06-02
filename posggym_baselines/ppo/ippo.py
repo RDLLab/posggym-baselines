@@ -6,15 +6,14 @@ independent PPO policies, where each policy is trained in self-play.
 
 import random
 from dataclasses import dataclass
-from typing import Dict, List, Optional
 
 import numpy as np
 import torch
+from gymnasium import spaces
 
 from posggym_baselines.ppo.config import PPOConfig
 from posggym_baselines.ppo.core import load_policies
 from posggym_baselines.ppo.network import PPOLSTMModel, PPOMLPModel, PPOModel
-from gymnasium import spaces
 
 
 @dataclass
@@ -24,7 +23,7 @@ class IPPOConfig(PPOConfig):
     # number of independent policies in the population (not including BR)
     pop_size: int = 4
     # whether to train best-response policy on top of population
-    include_BR: bool = False
+    include_BR: bool = False  # noqa: N815
 
     def __post_init__(self):
         super().__post_init__()
@@ -36,8 +35,8 @@ class IPPOConfig(PPOConfig):
         self.num_agents = len(env.possible_agents)
 
     def load_policies(
-        self, device: Optional[torch.device], checkpoint: Optional[int] = None
-    ) -> Dict[str, PPOModel]:
+        self, device: torch.device | None, checkpoint: int | None = None
+    ) -> dict[str, PPOModel]:
         num_actions = (
             self.act_space.n
             if isinstance(self.act_space, spaces.Discrete)
@@ -84,7 +83,7 @@ class IPPOConfig(PPOConfig):
 
         return policies
 
-    def get_policy_partner_distribution(self, policy_id: str) -> Dict[str, float]:
+    def get_policy_partner_distribution(self, policy_id: str) -> dict[str, float]:
         if policy_id == "BR":
             sp_policy_ids = self.get_sp_policy_ids()
             return {
@@ -94,7 +93,7 @@ class IPPOConfig(PPOConfig):
         # since episodes against BR are not used for training SP
         return {policy_id: 1.0}
 
-    def sample_episode_policies(self) -> List[str]:
+    def sample_episode_policies(self) -> list[str]:
         idx1 = torch.randint(self.pop_size + int(self.include_BR), size=(1,))[0]
         if idx1 == self.pop_size:
             policy_id2 = random.choice(self.get_sp_policy_ids())
@@ -105,15 +104,15 @@ class IPPOConfig(PPOConfig):
 
         return policy_ids
 
-    def get_all_policy_ids(self) -> List[str]:
+    def get_all_policy_ids(self) -> list[str]:
         sp_policy_ids = self.get_sp_policy_ids()
         if self.include_BR:
-            return sp_policy_ids + ["BR"]
+            return [*sp_policy_ids, "BR"]
         return sp_policy_ids
 
-    def get_sp_policy_ids(self) -> List[str]:
+    def get_sp_policy_ids(self) -> list[str]:
         return [f"sp_{i}" for i in range(self.pop_size)]
 
     @property
-    def train_policies(self) -> List[str]:
+    def train_policies(self) -> list[str]:
         return self.get_all_policy_ids()

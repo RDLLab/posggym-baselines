@@ -3,13 +3,13 @@
 import contextlib
 from multiprocessing.queues import Empty
 
+import numpy as np
 import torch
 import torch.multiprocessing as mp
+from gymnasium import spaces
 
 import posggym_baselines.ppo.utils as ppo_utils
 from posggym_baselines.ppo.config import PPOConfig
-import numpy as np
-from gymnasium import spaces
 
 
 def one_hot(x: np.ndarray, space: spaces.Space) -> torch.Tensor:
@@ -24,7 +24,7 @@ def one_hot(x: np.ndarray, space: spaces.Space) -> torch.Tensor:
         return RuntimeError("Unspport Space")
 
 
-def run_rollout_worker(
+def run_rollout_worker(  # noqa: PLR0915, PLR0912
     worker_id: int,
     config: PPOConfig,
     recv_queue: mp.JoinableQueue,
@@ -83,7 +83,7 @@ def run_rollout_worker(
         obs_buf_shape = obs_buf_shape[:-1] + (obs_buf_shape[-1] + one_hot_size,)
     obs_buf = torch.zeros(obs_buf_shape).to(device)
     actions_buf = torch.zeros(
-        buf_shape + () if config.act_space.shape is None else config.act_space.shape
+        (*buf_shape,) if config.act_space.shape is None else config.act_space.shape
     ).to(device)
     logprobs_buf = torch.zeros(buf_shape).to(device)
     rewards_buf = torch.zeros(buf_shape).to(device)
@@ -97,8 +97,8 @@ def run_rollout_worker(
         config.lstm_size if config.use_lstm else 1,
     )
     lstm_states_buf = (
-        torch.zeros((config.num_rollout_steps,) + lstm_state_shape).to(device),
-        torch.zeros((config.num_rollout_steps,) + lstm_state_shape).to(device),
+        torch.zeros((config.num_rollout_steps, *lstm_state_shape)).to(device),
+        torch.zeros((config.num_rollout_steps, *lstm_state_shape)).to(device),
     )
 
     # setup variables for tracking current step outputs
@@ -116,7 +116,7 @@ def run_rollout_worker(
     action_dim = (
         1
         if isinstance(config.act_space, spaces.Discrete)
-        else list(envs.action_spaces.values())[0].shape[1]
+        else next(iter(envs.action_spaces.values())).shape[1]
     )
     next_action = (
         torch.zeros((*next_vars_shape, action_dim)).long().to(config.worker_device)
@@ -190,7 +190,7 @@ def run_rollout_worker(
         # collect batch of experience
         policy_episode_stats = {pi_id: [] for pi_id in config.get_all_policy_ids()}
         num_episodes = 0
-        for step in range(0, config.num_rollout_steps):
+        for step in range(config.num_rollout_steps):
             obs_buf[step] = next_obs
             policy_idx_buf[step] = sampled_policy_idxs
             dones_buf[step] = next_done
@@ -244,7 +244,9 @@ def run_rollout_worker(
                         next_obs,
                         one_hot(
                             next_action.flatten(start_dim=0, end_dim=1),
-                            list(envs.env.unwrapped.single_action_spaces.values())[0],
+                            next(
+                                iter(envs.env.unwrapped.single_action_spaces.values())
+                            ),
                         ).numpy(),
                     ),
                     axis=-1,
@@ -277,7 +279,7 @@ def run_rollout_worker(
 
                     # get episode stats
                     for agent_id, policy_id in zip(
-                        envs.possible_agents, sampled_policies[env_idx]
+                        envs.possible_agents, sampled_policies[env_idx], strict=False
                     ):
                         if "episode" not in infos[agent_id]:
                             continue
@@ -347,7 +349,7 @@ def run_rollout_worker(
         )
         b_rewards = ppo_utils.split_and_pad_batch(rewards_buf, seq_idxs, config.seq_len)
         # +1 to include additional step at end of sequence which is used for calculating
-        # advantages and returns
+        # advantages and returns # noqa: ERA001
         # Also pad dones with 1.0, since this has the effect of zeroing out the
         # further steps in the sequence when calculating the advantages and returns
         b_dones = ppo_utils.split_and_pad_batch(

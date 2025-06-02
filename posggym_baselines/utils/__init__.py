@@ -1,5 +1,5 @@
-import uuid
 import os
+import uuid
 from pathlib import Path
 
 import posggym
@@ -20,7 +20,7 @@ def strtobool(val: str) -> bool:
     elif val in ("n", "no", "f", "false", "off", "0"):
         return False
     else:
-        raise ValueError("invalid truth value %r" % (val,))
+        raise ValueError(f"invalid truth value {val!r}")
 
 
 class NoOverwriteRecordVideo(RecordVideo):

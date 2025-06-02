@@ -2,14 +2,16 @@
 
 import math
 import time
+from collections.abc import Callable
 from itertools import product
 from multiprocessing.queues import Empty
-from typing import TYPE_CHECKING, Callable, Dict, List, Tuple, Union
+from typing import TYPE_CHECKING
 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.multiprocessing as mp
+
 from posggym_baselines.ppo.network import PPOModel
 
 
@@ -25,12 +27,12 @@ if TYPE_CHECKING:
 # - dictionary mapping from eval metric key to the value. The value can be a NxM
 #     matrix, a scalar, or matplotlib Figure
 EvalFn = Callable[
-    [Dict[str, PPOModel], "PPOConfig"],
-    Dict[str, Union[np.ndarray, float, plt.Figure]],
+    [dict[str, PPOModel], "PPOConfig"],
+    dict[str, np.ndarray | float | plt.Figure],
 ]
 
 # actions, rewards, done, obs
-Transition = Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
+Transition = tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
 
 
 def run_eval_worker(
@@ -104,8 +106,8 @@ def run_eval_worker(
 
 
 def run_pairwise_evaluation(
-    policies: List[Dict[str, PPOModel]], config: "PPOConfig"
-) -> Dict[str, np.ndarray]:
+    policies: list[dict[str, PPOModel]], config: "PPOConfig"
+) -> dict[str, np.ndarray]:
     """Run pairwise evaluation of policy population.
 
     Note, this function is only defined for environments with two agents.
@@ -261,8 +263,8 @@ def run_pairwise_evaluation(
 
 
 def run_all_pairwise_evaluation(
-    policies: Dict[str, PPOModel], config: "PPOConfig"
-) -> Dict[str, np.ndarray]:
+    policies: dict[str, PPOModel], config: "PPOConfig"
+) -> dict[str, np.ndarray]:
     """Run pairwise evaluation for all pairs in a policy population.
 
     Note, this is the same as run_pairwise_evaluation but follows EvalFn protocol.
@@ -271,7 +273,7 @@ def run_all_pairwise_evaluation(
 
 
 def run_train_distribution_evaluation(
-    policies: Dict[str, PPOModel], config: "PPOConfig"
+    policies: dict[str, PPOModel], config: "PPOConfig"
 ) -> np.ndarray:
     """Run pairwise evaluation for training distribution pairs in policy population.
 
@@ -299,12 +301,12 @@ def run_train_distribution_evaluation(
 
 
 def render_policies(
-    policies: List[Dict[str, PPOModel]],
+    policies: list[dict[str, PPOModel]],
     num_episodes: int,
     env,
     config: "PPOConfig",
     render: bool = False,
-) -> Dict[str, np.ndarray]:
+) -> dict[str, np.ndarray]:
     """Render pairwise episodes of policy population.
 
     Arguments
@@ -320,7 +322,7 @@ def render_policies(
     num_envs, num_agents = 1, config.num_agents
     device = config.eval_device
 
-    for num, policy_ids in enumerate(product(*policies)):
+    for _num, policy_ids in enumerate(product(*policies)):
         print(f"\nRendering policies: {policy_ids}")
         next_obs = (
             torch.tensor(env.reset()[0])

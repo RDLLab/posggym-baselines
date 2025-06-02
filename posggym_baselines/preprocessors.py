@@ -1,5 +1,6 @@
 """Preprocessors for policies."""
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from gymnasium import spaces
 

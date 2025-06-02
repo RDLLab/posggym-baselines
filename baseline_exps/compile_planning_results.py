@@ -21,7 +21,7 @@ Script has two modes:
 import argparse
 import warnings
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 import pandas as pd
 import yaml
@@ -70,7 +70,7 @@ def compile_sub_experiment_results(
             assert num_episodes == sub_exp_results_df["num"].max() + 1
             mean_results = sub_exp_results_df.mean(axis=0).to_dict()
             std_results = sub_exp_results_df.std(axis=0).to_dict()
-            summary_results: Dict[str, Any] = {
+            summary_results: dict[str, Any] = {
                 "num_episodes": num_episodes,
             }
             for k, v in mean_results.items():
@@ -85,7 +85,7 @@ def compile_sub_experiment_results(
             sub_exp_results_df = pd.DataFrame(summary_results)
 
         # add in experiment arguments
-        with open(exp_args_file, "r") as f:
+        with open(exp_args_file) as f:
             exp_args = yaml.safe_load(f)
 
         for k, v in exp_args.items():
@@ -117,7 +117,7 @@ def combine_all_experiment_results(
     combined: bool = False,
     belief: bool = False,
     per_step_belief: bool = False,
-) -> Dict[str, pd.DataFrame]:
+) -> dict[str, pd.DataFrame]:
     """Combine results from all experiments (alg, env) in `parent_dir`.
 
     Assumes each (alg, env) is in its own sub-directory of `parent_dir` with name

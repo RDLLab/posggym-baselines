@@ -2,7 +2,6 @@ import logging
 import math
 import random
 import time
-from typing import Dict, Optional, Tuple, Union
 
 import gymnasium as gym
 import numpy as np
@@ -31,7 +30,7 @@ class MCTS:
         model: M.POSGModel,
         agent_id: str,
         config: MCTSConfig,
-        other_agent_policies: Dict[str, OtherAgentPolicy],
+        other_agent_policies: dict[str, OtherAgentPolicy],
         search_policy: SearchPolicy,
     ):
         self.model = model
@@ -84,7 +83,7 @@ class MCTS:
         self._last_action = None
 
         self._step_num = 0
-        self.step_statistics: Dict[str, float] = {}
+        self.step_statistics: dict[str, float] = {}
         self._reset_step_statistics()
         self.stat_tracker = PlanningStatTracker(self)
 
@@ -311,7 +310,7 @@ class MCTS:
         obs_node: ObsNode,
         depth: int,
         search_policy: Policy,
-    ) -> Tuple[float, int]:
+    ) -> tuple[float, int]:
         if depth > self.config.depth_limit or obs_node.t > self.step_limit:
             return 0, depth
 
@@ -455,7 +454,7 @@ class MCTS:
         self,
         action: M.ActType,
         obs: M.ObsType,
-        policy: Union[Policy, OtherAgentPolicy],
+        policy: Policy | OtherAgentPolicy,
         policy_state: PolicyState,
     ) -> PolicyState:
         # this is just a wrapper around policy.get_next_state but also keeps track of
@@ -468,10 +467,10 @@ class MCTS:
 
     def _update_other_agent_policies(
         self,
-        joint_action: Dict[str, Optional[M.ActType]],
-        joint_obs: Dict[str, M.ObsType],
-        pi_state: Dict[str, PolicyState],
-    ) -> Dict[str, PolicyState]:
+        joint_action: dict[str, M.ActType | None],
+        joint_obs: dict[str, M.ObsType],
+        pi_state: dict[str, PolicyState],
+    ) -> dict[str, PolicyState]:
         next_policy_state = {}
         for i in self.model.possible_agents:
             if i == self.agent_id or i not in joint_action:
@@ -601,7 +600,7 @@ class MCTS:
 
     def _get_joint_action(
         self, hps: B.HistoryPolicyState, ego_action: M.ActType
-    ) -> Dict[str, M.ActType]:
+    ) -> dict[str, M.ActType]:
         agent_actions = {}
         for i in self.model.possible_agents:
             if i == self.agent_id:
@@ -653,7 +652,7 @@ class MCTS:
         obs_node: ObsNode,
         action: M.ActType,
         obs: M.ObsType,
-        target_node_size: Optional[int] = None,
+        target_node_size: int | None = None,
     ):
         """Reinvigoration belief associated to given history.
 
@@ -693,7 +692,7 @@ class MCTS:
             parent_belief=parent_obs_node.belief,
             joint_action_fn=self._reinvigorate_action_fn,
             joint_update_fn=self._reinvigorate_update_fn,
-            **{"use_rejected_samples": True},  # used for rejection sampling
+            use_rejected_samples=True,  # used for rejection sampling
         )
 
         reinvig_time = time.time() - start_time
@@ -701,15 +700,15 @@ class MCTS:
 
     def _reinvigorate_action_fn(
         self, hps: B.HistoryPolicyState, ego_action: M.ActType
-    ) -> Dict[str, M.ActType]:
+    ) -> dict[str, M.ActType]:
         return self._get_joint_action(hps, ego_action)
 
     def _reinvigorate_update_fn(
         self,
         hps: B.HistoryPolicyState,
-        joint_action: Dict[str, M.ActType],
-        joint_obs: Dict[str, M.ObsType],
-    ) -> Dict[str, PolicyState]:
+        joint_action: dict[str, M.ActType],
+        joint_obs: dict[str, M.ObsType],
+    ) -> dict[str, PolicyState]:
         return self._update_other_agent_policies(
             joint_action, joint_obs, hps.policy_state
         )

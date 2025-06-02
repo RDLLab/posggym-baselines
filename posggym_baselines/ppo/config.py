@@ -5,7 +5,7 @@ from __future__ import annotations
 import random
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING, Dict, List, Optional, Union
+from typing import TYPE_CHECKING
 
 import numpy as np
 import torch
@@ -14,6 +14,7 @@ from posggym.wrappers import RecordEpisodeStatistics, StackEnv
 
 from posggym_baselines.config import BASE_RESULTS_DIR
 from posggym_baselines.ppo.eval import EvalFn, run_all_pairwise_evaluation
+
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -37,14 +38,14 @@ class PPOConfig:
     env_creator_fn: callable
 
     # List of evaluation functions to use
-    eval_fns: List[EvalFn] = field(
+    eval_fns: list[EvalFn] = field(
         default_factory=lambda: [run_all_pairwise_evaluation]
     )
 
     # The name of this experiment
     exp_name: str = "ppo"
     # The name of this run
-    # run_name = f"{exp_name}_{env_id}_{seed}_{time}"
+    # run_name = f"{exp_name}_{env_id}_{seed}_{time}" # noqa: ERA001
     run_name: str = field(init=False)
     # Experiment seed
     seed: int = 0
@@ -64,9 +65,9 @@ class PPOConfig:
     # wandb project name
     wandb_project: str = "posggym_baselines"
     # wandb entity name
-    wandb_entity: Optional[str] = None
+    wandb_entity: str | None = None
     # wandb group name
-    wandb_group: Optional[str] = None
+    wandb_group: str | None = None
     # Directory where the model and logs will be saved
     log_dir: Path = None
     # Directory where videos will be saved
@@ -74,7 +75,7 @@ class PPOConfig:
     # Directory where models will be saved
     model_dir: Path = field(init=False)
     # optional directory to load existing algorithm/model from
-    load_dir: Optional[Path] = None
+    load_dir: Path | None = None
     # number of updates (i.e. batches) after which the model/algorithm is saved
     # if 0, never save
     # if > 0, save every save_interval updates
@@ -124,7 +125,7 @@ class PPOConfig:
     # Number of steps in each mini-batch.
     minibatch_size: int = 2048
     # Number of sequence chunks in each mini-batch.
-    # minibatch_num_seqs = minibatch_size // seq_len
+    # minibatch_num_seqs = minibatch_size // seq_len # noqa: ERA001
     minibatch_num_seqs: int = field(init=False)
     # Number of epochs to train policy per update
     update_epochs: int = 2
@@ -152,7 +153,7 @@ class PPOConfig:
     # The maximum norm for the gradient clipping
     max_grad_norm: float = 0.5
     # The target KL divergence threshold
-    target_kl: Optional[float] = None
+    target_kl: float | None = None
 
     # Whether to use a recurrent policy
     use_lstm: bool = True
@@ -161,9 +162,9 @@ class PPOConfig:
     # Number of layers in the LSTM
     lstm_num_layers: int = 1
     # size of network trunk
-    trunk_sizes: List[int] = field(default_factory=lambda: [64])
+    trunk_sizes: list[int] = field(default_factory=lambda: [64])
     # size of network heads
-    head_sizes: List[int] = field(default_factory=lambda: [64])
+    head_sizes: list[int] = field(default_factory=lambda: [64])
     # Include Previous Action
     use_previous_action: bool = True
     # Is the LSTM only doing a residual term...
@@ -219,11 +220,11 @@ class PPOConfig:
         self.num_agents = len(env.possible_agents)
 
         self.obs_space = env.observation_spaces[env.possible_agents[0]]
-        for i, obs_space in env.observation_spaces.items():
+        for _i, obs_space in env.observation_spaces.items():
             assert obs_space == self.obs_space, "All agents must have same obs space"
 
         self.act_space = env.action_spaces[env.possible_agents[0]]
-        for i, act_space in env.action_spaces.items():
+        for _i, act_space in env.action_spaces.items():
             assert act_space == self.act_space, "All agents must have same act space"
 
     def load_vec_env(self, num_envs: int | None = None, worker_idx: int | None = None):
@@ -238,21 +239,21 @@ class PPOConfig:
         return env
 
     @property
-    def train_policies(self) -> List[str]:
+    def train_policies(self) -> list[str]:
         """IDs of policies that are being trained using PPO."""
         raise NotImplementedError
 
     def load_policies(
         self, device: torch.device | None
-    ) -> Dict[str, Union[PPOModel, Policy]]:
+    ) -> dict[str, PPOModel | Policy]:
         """Load models of all policies for algorithm."""
         raise NotImplementedError
 
-    def get_obs_processors(self) -> Dict[str, Processor]:
+    def get_obs_processors(self) -> dict[str, Processor]:
         """Get the observation processors for each policy."""
         raise NotImplementedError
 
-    def sample_episode_policies(self) -> List[str]:
+    def sample_episode_policies(self) -> list[str]:
         """Sample policies to use for each agent in an episode.
 
         Returns
@@ -262,7 +263,7 @@ class PPOConfig:
         """
         raise NotImplementedError
 
-    def get_policy_partner_distribution(self, policy_id: str) -> Dict[str, float]:
+    def get_policy_partner_distribution(self, policy_id: str) -> dict[str, float]:
         """Get the distribution of partner policies for the given policy ID.
 
         Arguments
@@ -277,15 +278,15 @@ class PPOConfig:
         """
         raise NotImplementedError
 
-    def get_all_policy_ids(self) -> List[str]:
+    def get_all_policy_ids(self) -> list[str]:
         """Get the IDs of all policies."""
         raise NotImplementedError
 
-    def get_policy_idx_to_id_mapping(self) -> Dict[int, str]:
+    def get_policy_idx_to_id_mapping(self) -> dict[int, str]:
         """Get the mapping from policy index to policy ID."""
         return dict(enumerate(self.get_all_policy_ids()))
 
-    def get_policy_id_to_idx_mapping(self) -> Dict[str, int]:
+    def get_policy_id_to_idx_mapping(self) -> dict[str, int]:
         """Get the mapping from policy ID to policy index."""
         return {v: k for k, v in self.get_policy_idx_to_id_mapping().items()}
 
@@ -297,10 +298,10 @@ class PPOConfig:
         """Get the ID of the policy."""
         return self.get_policy_idx_to_id_mapping()[policy_idx]
 
-    def asdict(self) -> Dict:
+    def asdict(self) -> dict:
         return asdict(self)
 
-    def aspickleable(self) -> Dict:
+    def aspickleable(self) -> dict:
         """Get a pickleable version of the config."""
         return {
             k: v

@@ -1,6 +1,5 @@
 import abc
 import random
-from typing import Dict, List, Optional
 
 import posggym.model as M
 from posggym.agents.policy import Policy, PolicyState
@@ -28,7 +27,7 @@ class OtherAgentPolicy(abc.ABC):
     @abc.abstractmethod
     def get_next_state(
         self,
-        action: Optional[M.ActType],
+        action: M.ActType | None,
         obs: M.ObsType,
         state: PolicyState,
     ) -> PolicyState:
@@ -75,7 +74,7 @@ class OtherAgentPolicy(abc.ABC):
         """
 
     @abc.abstractmethod
-    def get_pi(self, state: PolicyState) -> Dict[M.ActType, float]:
+    def get_pi(self, state: PolicyState) -> dict[M.ActType, float]:
         """Get policy's distribution over actions for given policy state.
 
         Subclasses must implement this method
@@ -121,12 +120,12 @@ class OtherAgentPolicy(abc.ABC):
             state = self.get_next_state(a, o, state)
         return state
 
+    @abc.abstractmethod
     def close(self):
         """Close policy and perform any necessary cleanup.
 
         Should be overridden in subclasses as necessary.
         """
-        pass
 
 
 class RandomOtherAgentPolicy(OtherAgentPolicy):
@@ -141,7 +140,7 @@ class RandomOtherAgentPolicy(OtherAgentPolicy):
 
     def get_next_state(
         self,
-        action: Optional[M.ActType],
+        action: M.ActType | None,
         obs: M.ObsType,
         state: PolicyState,
     ) -> PolicyState:
@@ -150,7 +149,7 @@ class RandomOtherAgentPolicy(OtherAgentPolicy):
     def sample_action(self, state: PolicyState) -> M.ActType:
         return self._action_space.sample()
 
-    def get_pi(self, state: PolicyState) -> Dict[M.ActType, float]:
+    def get_pi(self, state: PolicyState) -> dict[M.ActType, float]:
         return {a: 1.0 / self._action_space.n for a in range(self._action_space.n)}
 
 
@@ -169,7 +168,7 @@ class OtherAgentMixturePolicy(OtherAgentPolicy):
         self,
         model: M.POSGModel,
         agent_id: str,
-        policies: Dict[str, Policy],
+        policies: dict[str, Policy],
     ):
         super().__init__(model, agent_id)
         assert len(model.possible_agents) == 2, "Currently only supports 2 agents"
@@ -185,7 +184,7 @@ class OtherAgentMixturePolicy(OtherAgentPolicy):
 
     def get_next_state(
         self,
-        action: Optional[M.ActType],
+        action: M.ActType | None,
         obs: M.ObsType,
         state: PolicyState,
     ) -> PolicyState:
@@ -201,7 +200,7 @@ class OtherAgentMixturePolicy(OtherAgentPolicy):
         policy_state = state["policy_state"]
         return self.policies[policy_id].sample_action(policy_state)
 
-    def get_pi(self, state: PolicyState) -> Dict[M.ActType, float]:
+    def get_pi(self, state: PolicyState) -> dict[M.ActType, float]:
         policy_id = state["policy_id"]
         policy_state = state["policy_state"]
         pi = self.policies[policy_id].get_pi(policy_state).probs
@@ -218,7 +217,7 @@ class OtherAgentMixturePolicy(OtherAgentPolicy):
 
     @staticmethod
     def load_posggym_agents_policy(
-        model: M.POSGModel, agent_id: str, policy_ids: List[str]
+        model: M.POSGModel, agent_id: str, policy_ids: list[str]
     ) -> "OtherAgentMixturePolicy":
         import posggym.agents as pga
 

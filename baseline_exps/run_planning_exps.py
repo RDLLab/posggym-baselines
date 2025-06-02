@@ -49,7 +49,6 @@ import multiprocessing as mp
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import List
 
 import exp_utils
 import posggym
@@ -87,7 +86,7 @@ def init_intmcp(model: posggym.POSGModel, exp_params: PlanningExpParams) -> INTM
 
 def get_intmcp_exp_params(
     args, env_data: exp_utils.EnvData, exp_name: str, exp_results_parent_dir: Path
-) -> List[PlanningExpParams]:
+) -> list[PlanningExpParams]:
     config_kwargs = dict(exp_utils.DEFAULT_PLANNING_CONFIG_KWARGS_UCB)
     config_kwargs["truncated"] = False
 
@@ -146,7 +145,7 @@ def init_ipomcp(model: posggym.POSGModel, exp_params: PlanningExpParams) -> IPOM
 
 def get_ipomcp_exp_params(
     args, env_data: exp_utils.EnvData, exp_name: str, exp_results_parent_dir: Path
-) -> List[PlanningExpParams]:
+) -> list[PlanningExpParams]:
     config_kwargs = dict(exp_utils.DEFAULT_PLANNING_CONFIG_KWARGS_UCB)
     config_kwargs["truncated"] = False
 
@@ -202,7 +201,7 @@ def init_pomcp(model: posggym.POSGModel, exp_params: PlanningExpParams) -> POMCP
 
 def get_pomcp_exp_params(
     args, env_data: exp_utils.EnvData, exp_name: str, exp_results_parent_dir: Path
-) -> List[PlanningExpParams]:
+) -> list[PlanningExpParams]:
     config_kwargs = dict(exp_utils.DEFAULT_PLANNING_CONFIG_KWARGS_UCB)
     config_kwargs["truncated"] = False
     config_kwargs["state_belief_only"] = True
@@ -263,7 +262,7 @@ def init_potmmcp(model: posggym.POSGModel, exp_params: PlanningExpParams) -> POT
 
 def get_potmmcp_exp_params(
     args, env_data: exp_utils.EnvData, exp_name: str, exp_results_parent_dir: Path
-) -> List[PlanningExpParams]:
+) -> list[PlanningExpParams]:
     belief_stats_to_track = []
     if args.track_belief_stats:
         belief_stats_to_track = ["state", "history", "action", "policy"]

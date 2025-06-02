@@ -1,6 +1,5 @@
 import math
 from dataclasses import dataclass, field
-from typing import Optional
 
 from posggym_baselines.planning.utils import KnownBounds
 
@@ -15,12 +14,12 @@ class MCTSConfig:
     truncated: bool
     action_selection: str = "pucb"
     pucb_exploration_fraction: float = 0.5
-    known_bounds: Optional[KnownBounds] = None
+    known_bounds: KnownBounds | None = None
     extra_particles_prop: float = 1.0 / 16
     reinvigoration_sample_limit_factor: float = 4.0
-    step_limit: Optional[int] = None
+    step_limit: int | None = None
     epsilon: float = 0.01
-    seed: Optional[int] = None
+    seed: int | None = None
     state_belief_only: bool = False
     # if `truncated` is True, and search policy has no value function, then
     # use rollout, otherwise exception is thrown

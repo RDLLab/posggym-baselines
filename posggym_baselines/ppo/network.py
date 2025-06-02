@@ -1,5 +1,4 @@
 """Actor and Critic network for PPO algorithm."""
-from typing import List, Optional, Tuple
 
 import numpy as np
 import torch
@@ -23,7 +22,7 @@ class PPOModel(nn.Module):
     def get_value(
         self,
         x: torch.tensor,
-        lstm_state: Optional[Tuple[torch.tensor, torch.tensor]],
+        lstm_state: tuple[torch.tensor, torch.tensor] | None,
         done: torch.tensor,
     ) -> torch.tensor:
         """Get the value from the critic.
@@ -55,14 +54,14 @@ class PPOModel(nn.Module):
     def get_action(
         self,
         x: torch.tensor,
-        lstm_state: Optional[Tuple[torch.tensor, torch.tensor]],
+        lstm_state: tuple[torch.tensor, torch.tensor] | None,
         done: torch.tensor,
-        action: Optional[torch.tensor] = None,
-    ) -> Tuple[
+        action: torch.tensor | None = None,
+    ) -> tuple[
         torch.tensor,
         torch.tensor,
         torch.tensor,
-        Optional[Tuple[torch.tensor, torch.tensor]],
+        tuple[torch.tensor, torch.tensor] | None,
     ]:
         """Get action from the actor.
 
@@ -99,15 +98,15 @@ class PPOModel(nn.Module):
     def get_action_and_value(
         self,
         x: torch.tensor,
-        lstm_state: Optional[Tuple[torch.tensor, torch.tensor]],
+        lstm_state: tuple[torch.tensor, torch.tensor] | None,
         done: torch.tensor,
-        action: Optional[torch.tensor] = None,
-    ) -> Tuple[
+        action: torch.tensor | None = None,
+    ) -> tuple[
         torch.tensor,
         torch.tensor,
         torch.tensor,
         torch.tensor,
-        Optional[Tuple[torch.tensor, torch.tensor]],
+        tuple[torch.tensor, torch.tensor] | None,
     ]:
         """Get action from the actor and value from the critic.
 
@@ -156,11 +155,11 @@ class PPOLSTMModel(PPOModel):
     def __init__(
         self,
         input_size: int,
-        num_actions: int | List[int],
-        trunk_sizes: List[int],
+        num_actions: int | list[int],
+        trunk_sizes: list[int],
         lstm_size: int,
         lstm_layers: int,
-        head_sizes: List[int],
+        head_sizes: list[int],
         use_residual_lstm: bool,
     ):
         super().__init__()
@@ -218,9 +217,9 @@ class PPOLSTMModel(PPOModel):
     def get_states(
         self,
         x: torch.tensor,
-        lstm_state: Tuple[torch.tensor, torch.tensor],
+        lstm_state: tuple[torch.tensor, torch.tensor],
         done: torch.tensor,
-    ) -> Tuple[torch.tensor, Tuple[torch.tensor, torch.tensor]]:
+    ) -> tuple[torch.tensor, tuple[torch.tensor, torch.tensor]]:
         """Get the next states from the LSTM.
 
         B = batch_size (typically the number of parallel environments contained in the
@@ -260,7 +259,7 @@ class PPOLSTMModel(PPOModel):
         hidden = hidden.reshape((-1, batch_size, self.lstm.input_size))
         done = done.reshape((-1, batch_size))
         new_hidden = []
-        for h, d in zip(hidden, done):
+        for h, d in zip(hidden, done, strict=False):
             h, lstm_state = self.lstm(
                 h.unsqueeze(0),
                 (
@@ -278,7 +277,7 @@ class PPOLSTMModel(PPOModel):
     def get_value(
         self,
         x: torch.tensor,
-        lstm_state: Optional[Tuple[torch.tensor, torch.tensor]],
+        lstm_state: tuple[torch.tensor, torch.tensor] | None,
         done: torch.tensor,
     ) -> torch.tensor:
         assert lstm_state is not None
@@ -288,14 +287,14 @@ class PPOLSTMModel(PPOModel):
     def get_action(
         self,
         x: torch.tensor,
-        lstm_state: Optional[Tuple[torch.tensor, torch.tensor]],
+        lstm_state: tuple[torch.tensor, torch.tensor] | None,
         done: torch.tensor,
-        action: Optional[torch.tensor] = None,
-    ) -> Tuple[
+        action: torch.tensor | None = None,
+    ) -> tuple[
         torch.tensor,
         torch.tensor,
         torch.tensor,
-        Optional[Tuple[torch.tensor, torch.tensor]],
+        tuple[torch.tensor, torch.tensor] | None,
     ]:
         assert lstm_state is not None
         hidden, lstm_state = self.get_states(x, lstm_state, done)
@@ -314,10 +313,10 @@ class PPOLSTMModel(PPOModel):
                 logits.shape[0], len(self.num_actions), self.num_actions[0]
             ).transpose(1, 0)
 
-            def transpose(x):  # noqa: F811
+            def transpose(x):
                 return x.T
 
-            def transposeSum(x):  # noqa: F811
+            def transposeSum(x):
                 return x.T.sum(1)
 
         probs = Categorical(logits=logits)
@@ -333,15 +332,15 @@ class PPOLSTMModel(PPOModel):
     def get_action_and_value(
         self,
         x: torch.tensor,
-        lstm_state: Optional[Tuple[torch.tensor, torch.tensor]],
+        lstm_state: tuple[torch.tensor, torch.tensor] | None,
         done: torch.tensor,
-        action: Optional[torch.tensor] = None,
-    ) -> Tuple[
+        action: torch.tensor | None = None,
+    ) -> tuple[
         torch.tensor,
         torch.tensor,
         torch.tensor,
         torch.tensor,
-        Optional[Tuple[torch.tensor, torch.tensor]],
+        tuple[torch.tensor, torch.tensor] | None,
     ]:
         assert lstm_state is not None
         hidden, lstm_state = self.get_states(x, lstm_state, done)
@@ -360,10 +359,10 @@ class PPOLSTMModel(PPOModel):
                 logits.shape[0], len(self.num_actions), self.num_actions[0]
             ).transpose(1, 0)
 
-            def transpose(x):  # noqa: F811
+            def transpose(x):
                 return x.T
 
-            def transposeSum(x):  # noqa: F811
+            def transposeSum(x):
                 return x.T.sum(1)
 
         probs = Categorical(logits=logits)
@@ -390,8 +389,8 @@ class PPOMLPModel(PPOModel):
         self,
         input_size: int,
         num_actions: int,
-        trunk_sizes: List[int],
-        head_sizes: List[int],
+        trunk_sizes: list[int],
+        head_sizes: list[int],
     ):
         super().__init__()
         self.input_size = input_size
@@ -431,7 +430,7 @@ class PPOMLPModel(PPOModel):
     def get_value(
         self,
         x: torch.tensor,
-        lstm_state: Optional[Tuple[torch.tensor, torch.tensor]],
+        lstm_state: tuple[torch.tensor, torch.tensor] | None,
         done: torch.tensor,
     ) -> torch.tensor:
         hidden = self.trunk(x)
@@ -440,14 +439,14 @@ class PPOMLPModel(PPOModel):
     def get_action(
         self,
         x: torch.tensor,
-        lstm_state: Optional[Tuple[torch.tensor, torch.tensor]],
+        lstm_state: tuple[torch.tensor, torch.tensor] | None,
         done: torch.tensor,
-        action: Optional[torch.tensor] = None,
-    ) -> Tuple[
+        action: torch.tensor | None = None,
+    ) -> tuple[
         torch.tensor,
         torch.tensor,
         torch.tensor,
-        Optional[Tuple[torch.tensor, torch.tensor]],
+        tuple[torch.tensor, torch.tensor] | None,
     ]:
         hidden = self.trunk(x)
         logits = self.actor(hidden)
@@ -464,15 +463,15 @@ class PPOMLPModel(PPOModel):
     def get_action_and_value(
         self,
         x: torch.tensor,
-        lstm_state: Optional[Tuple[torch.tensor, torch.tensor]],
+        lstm_state: tuple[torch.tensor, torch.tensor] | None,
         done: torch.tensor,
-        action: Optional[torch.tensor] = None,
-    ) -> Tuple[
+        action: torch.tensor | None = None,
+    ) -> tuple[
         torch.tensor,
         torch.tensor,
         torch.tensor,
         torch.tensor,
-        Optional[Tuple[torch.tensor, torch.tensor]],
+        tuple[torch.tensor, torch.tensor] | None,
     ]:
         hidden = self.trunk(x)
         logits = self.actor(hidden)

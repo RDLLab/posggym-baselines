@@ -3,10 +3,10 @@ import argparse
 import csv
 import math
 import time
+from collections.abc import Callable
 from copy import deepcopy
 from datetime import datetime
 from itertools import product
-from typing import Callable, Dict, Optional, Tuple
 
 import exp_utils
 import numpy as np
@@ -14,14 +14,13 @@ import posggym
 import torch
 from posggym.agents.wrappers import AgentEnvWrapper
 from posggym.wrappers import FlattenObservations
-
 from posggym_baselines.ppo.br_ppo import BRPPOConfig
 from posggym_baselines.ppo.network import PPOModel
 from posggym_baselines.utils import NoOverwriteRecordVideo, strtobool
 
 
 def get_env_creator_fn(
-    config: BRPPOConfig, env_idx: int, worker_idx: Optional[int] = None
+    config: BRPPOConfig, env_idx: int, worker_idx: int | None = None
 ) -> Callable:
     """Get function for creating the environment."""
 
@@ -58,9 +57,9 @@ def get_env_creator_fn(
 
 
 def run_evaluation_episodes(
-    br_policy: Tuple[str, PPOModel],
+    br_policy: tuple[str, PPOModel],
     config: BRPPOConfig,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """Run evaluation episodes for a single BR-PPO policy."""
     assert config.num_agents == 1
     num_envs, num_agents = config.num_eval_envs, config.num_agents
@@ -222,6 +221,7 @@ def main(args):
                         results["len"],
                         results["return"],
                         results["discounted_return"],
+                        strict=False,
                     )
                 ):
                     writer.writerow(

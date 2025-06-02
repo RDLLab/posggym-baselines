@@ -6,6 +6,7 @@ import numpy as np
 import seaborn as sns
 from torch.utils.tensorboard import SummaryWriter
 
+
 try:
     import wandb
 except ImportError:
@@ -38,9 +39,9 @@ class Logger(abc.ABC):
     def upload_videos(self, step: int):
         """Upload any new video files in config.video_dir."""
 
+    @abc.abstractmethod
     def close(self):
         """Close the logger."""
-        pass
 
 
 class TensorBoardLogger(Logger):
@@ -72,8 +73,9 @@ class TensorBoardLogger(Logger):
         self.writer = SummaryWriter(log_dir=self.log_dir)
         self.writer.add_text(
             "hyperparameters",
-            "|param|value|\n|-|-|\n%s"
-            % ("\n".join([f"|{key}|{value}|" for key, value in vars(config).items()])),
+            "|param|value|\n|-|-|\n{}".format(
+                "\n".join([f"|{key}|{value}|" for key, value in vars(config).items()])
+            ),
         )
 
         self.uploaded_video_files = set()

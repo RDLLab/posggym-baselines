@@ -16,24 +16,24 @@ set `--track_wandb=False`. To disable all logging (i.e. for debugging), set
 Use `--help` to see all available options.
 
 """
+import functools
+import re
+from collections.abc import Callable
 from copy import deepcopy
-from typing import Callable, Optional
+from enum import Enum
+from pathlib import Path
+from typing import Annotated
 
 import exp_utils
 import posggym
-from posggym.wrappers import FlattenObservations, RecordVideo, DiscretizeActions
-
+import typer
+from gymnasium import spaces
+from posggym.wrappers import DiscretizeActions, FlattenObservations, RecordVideo
 from posggym_baselines.ppo.config import PPOConfig
 from posggym_baselines.ppo.core import run_ppo
 from posggym_baselines.ppo.ippo import IPPOConfig
 from posggym_baselines.ppo.klr_ppo import KLRPPOConfig
-from gymnasium import spaces
-from typing_extensions import Annotated
-import typer
-from enum import Enum
-from pathlib import Path
-import re
-import functools
+
 
 app = typer.Typer()
 
@@ -58,7 +58,7 @@ class Algs(str, Enum):
 def get_env_creator_fn(
     config: PPOConfig,
     env_idx: int,
-    worker_idx: Optional[int] = None,
+    worker_idx: int | None = None,
     n_actions: int = 4,
 ) -> Callable:
     """Get function for creating the environment."""
@@ -111,7 +111,7 @@ def train(
     num_workers: Annotated[int, typer.Option()] = 2,
     use_lstm: Annotated[bool, typer.Option()] = True,
     log_dir: Annotated[Path, typer.Option()] = Path("."),
-    load_dir: Annotated[Optional[Path], typer.Option()] = None,
+    load_dir: Annotated[Path | None, typer.Option()] = None,
     n_actions: Annotated[int, typer.Option()] = 4,
 ):
     d = deepcopy(locals())
@@ -124,7 +124,7 @@ def train(
     if (env_data_path / "PPOConfig.yaml").exists():
         import yaml
 
-        with open(env_data_path / "PPOConfig.yaml", "r") as file:
+        with open(env_data_path / "PPOConfig.yaml") as file:
             loaded_config = yaml.safe_load(file)
     else:
         loaded_config = {}

@@ -26,20 +26,19 @@ import multiprocessing as mp
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import List
 
 import exp_utils
 import posggym.model as M
 import torch
 from exp_utils import CombinedExpParams
 from posggym.agents.utils import processors
-
 from posggym_baselines.planning.config import MCTSConfig
 from posggym_baselines.planning.mcts import MCTS
 from posggym_baselines.planning.other_policy import OtherAgentMixturePolicy
 from posggym_baselines.planning.search_policy import PPOLSTMSearchPolicy
 from posggym_baselines.ppo.network import PPOLSTMModel
 from posggym_baselines.utils import strtobool
+
 
 # Number of different seeds used to train RL policies
 NUM_RL_POLICY_SEEDS = 5
@@ -95,12 +94,12 @@ def get_combined_exp_params(
     env_data: exp_utils.EnvData,
     exp_name: str,
     exp_results_parent_dir: Path,
-    search_times: List[float],
+    search_times: list[float],
     num_episodes: int,
     exp_time_limit: int,
     track_belief_stats: bool,
     track_per_step_belief_stats: bool,
-) -> List[CombinedExpParams]:
+) -> list[CombinedExpParams]:
     config_kwargs = dict(exp_utils.DEFAULT_PLANNING_CONFIG_KWARGS_PUCB)
 
     belief_stats_to_track = []

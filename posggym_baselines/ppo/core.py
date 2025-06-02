@@ -5,15 +5,14 @@ import time
 from datetime import timedelta
 from multiprocessing.queues import Empty, Full
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, List, Optional, Union
+from typing import TYPE_CHECKING
 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.multiprocessing as mp
-import torch.nn as nn
-import torch.optim as optim
 from gymnasium import spaces
+from torch import nn, optim
 
 import posggym_baselines.ppo.utils as ppo_utils
 from posggym_baselines.ppo.eval import run_eval_worker
@@ -48,10 +47,10 @@ class PPOLearner:
 
     def train(
         self,
-        worker_recv_queues: List[mp.JoinableQueue],
-        worker_send_queues: List[mp.JoinableQueue],
-        eval_recv_queue: Optional[mp.JoinableQueue],
-        eval_send_queue: Optional[mp.JoinableQueue],
+        worker_recv_queues: list[mp.JoinableQueue],
+        worker_send_queues: list[mp.JoinableQueue],
+        eval_recv_queue: mp.JoinableQueue | None,
+        eval_send_queue: mp.JoinableQueue | None,
         termination_event: mp.Event,
     ):
         """Run PPO training.
@@ -150,7 +149,7 @@ class PPOLearner:
             self.writer.log_scalar("charts/update", update, global_step)
             self.writer.log_scalar(
                 "charts/learning_rate",
-                list(self.optimizers.values())[0].param_groups[0]["lr"],
+                next(iter(self.optimizers.values())).param_groups[0]["lr"],
                 global_step,
             )
             self.writer.log_scalar("charts/SPS", sps, global_step)
@@ -222,7 +221,7 @@ class PPOLearner:
 
             update += 1
 
-    def update(self, batch: Dict[str, torch.tensor], global_step: int):
+    def update(self, batch: dict[str, torch.tensor], global_step: int):
         """Update the policies using the batch of experience."""
         # calculate advantages and monte-carlo returns
         rewards_buf, dones_buf, values_buf = (
@@ -285,8 +284,8 @@ class PPOLearner:
             b_obs = (
                 policy_batch["obs"]
                 .reshape(
-                    (-1,)
-                    + (
+                    (
+                        -1,
                         self.config.obs_space.shape[0]
                         + (one_hot_size if self.config.use_previous_action else 0),
                     )
@@ -296,7 +295,7 @@ class PPOLearner:
             b_logprobs = policy_batch["logprobs"].reshape(-1).to(self.config.device)
             b_actions = (
                 policy_batch["actions"]
-                .reshape((-1,) + self.config.act_space.shape)
+                .reshape((-1, *self.config.act_space.shape))
                 .to(self.config.device)
             )
             b_advantages = policy_batch["advantages"].reshape(-1).to(self.config.device)
@@ -315,7 +314,7 @@ class PPOLearner:
             clipfracs = []
             approx_kl, old_approx_kl, unclipped_grad_norm = 0, 0, 0
             entropy_loss, pg_loss, v_loss, loss = 0, 0, 0, 0
-            for epoch in range(self.config.update_epochs):
+            for _epoch in range(self.config.update_epochs):
                 np.random.shuffle(seq_indxs)
 
                 # minibatch update, using data from randomized subset of sequences
@@ -452,7 +451,6 @@ class PPOLearner:
                 if not reported_wait:
                     print("learner: Eval queue full, waiting for eval to finish")
                     reported_wait = True
-                pass
 
         # check if previous eval finished and log results
         evals_to_log = True
@@ -516,10 +514,10 @@ class PPOLearner:
 def load_policies(
     config: "PPOConfig",
     save_dir: Path,
-    checkpoint: Optional[int] = None,
-    policies: Optional[Dict[str, PPOModel]] = None,
-    device: Optional[Union[str, torch.device]] = None,
-) -> Dict[str, PPOModel]:
+    checkpoint: int | None = None,
+    policies: dict[str, PPOModel] | None = None,
+    device: str | torch.device | None = None,
+) -> dict[str, PPOModel]:
     """Load policies from checkpoint files.
 
     If checkpoint is None, load the latest checkpoint.
@@ -555,10 +553,10 @@ def load_policies(
 
 def run_learner(
     config: "PPOConfig",
-    worker_recv_queues: List[mp.JoinableQueue],
-    worker_send_queues: List[mp.JoinableQueue],
-    eval_recv_queue: Optional[mp.JoinableQueue],
-    eval_send_queue: Optional[mp.JoinableQueue],
+    worker_recv_queues: list[mp.JoinableQueue],
+    worker_send_queues: list[mp.JoinableQueue],
+    eval_recv_queue: mp.JoinableQueue | None,
+    eval_send_queue: mp.JoinableQueue | None,
     termination_event: mp.Event,
 ):
     """Run PPO learner process.

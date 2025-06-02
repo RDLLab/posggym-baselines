@@ -2,7 +2,6 @@ import logging
 import math
 import random
 import time
-from typing import Dict, Optional, Tuple, Union
 
 import gymnasium as gym
 import numpy as np
@@ -36,8 +35,8 @@ class INTMCP:
         agent_id: str,
         config: MCTSConfig,
         nesting_level: int,
-        other_agent_policies: Optional[Dict[str, "INTMCP"]],
-        search_policies: Dict[str, SearchPolicy],
+        other_agent_policies: dict[str, "INTMCP"] | None,
+        search_policies: dict[str, SearchPolicy],
     ):
         if other_agent_policies is None:
             other_agent_policies = {}
@@ -101,7 +100,7 @@ class INTMCP:
         self.history = AgentHistory.get_init_history(obs=None)
 
         self._step_num = 0
-        self.step_statistics: Dict[str, float] = {}
+        self.step_statistics: dict[str, float] = {}
         self._reset_step_statistics()
         self.stat_tracker = PlanningStatTracker(self)
 
@@ -135,7 +134,7 @@ class INTMCP:
 
         return self._last_action
 
-    def _collect_nested_statistics(self) -> Dict:
+    def _collect_nested_statistics(self) -> dict:
         # This functions adds up statistics of each NST in the hierarchy
         # Only adds statistics that are collected at each level, so doesn't
         # add up 'search_time' or 'update_time' which are only collected
@@ -213,7 +212,7 @@ class INTMCP:
         self.step_statistics["update_time"] = update_time
         self._log_info(f"Update time = {update_time:.4f}s")
 
-    def _initial_nested_update(self, history_dist: Dict[AgentHistory, float]):
+    def _initial_nested_update(self, history_dist: dict[AgentHistory, float]):
         try:
             # check if model has implemented get_agent_initial_belief
             hist = next(iter(history_dist))
@@ -275,7 +274,7 @@ class INTMCP:
             for i, pi in self.other_agent_policies.items():
                 pi._initial_nested_update(nested_histories[i])
 
-    def _nested_update(self, history_dist: Dict[AgentHistory, float], current_t: int):
+    def _nested_update(self, history_dist: dict[AgentHistory, float], current_t: int):
         self._log_debug("Pruning unused nodes from tree")
         # traverse all nodes in tree up to current step
         for action_node in self.root.get_child_nodes():
@@ -307,7 +306,7 @@ class INTMCP:
         self,
         obs_node: ObsNode,
         node_history: AgentHistory,
-        history_dist: Dict[AgentHistory, float],
+        history_dist: dict[AgentHistory, float],
         current_t: int,
     ):
         """Recursively Traverse and prune histories from tree"""
@@ -335,8 +334,8 @@ class INTMCP:
 
     def get_nested_history_dist(
         self,
-        histories: Dict[AgentHistory, float],
-    ) -> Dict[int, Dict[AgentHistory, float]]:
+        histories: dict[AgentHistory, float],
+    ) -> dict[int, dict[AgentHistory, float]]:
         """Get distribution over nested histories given higher level distribution."""
         nested_histories = {}
         for hist, h_prob in histories.items():
@@ -446,7 +445,7 @@ class INTMCP:
         hps: B.HistoryPolicyState,
         obs_node: ObsNode,
         depth: int,
-    ) -> Tuple[float, int]:
+    ) -> tuple[float, int]:
         if depth > self.config.depth_limit or (
             self.step_limit is not None and obs_node.t + depth > self.step_limit
         ):
@@ -548,8 +547,8 @@ class INTMCP:
         self,
         hps: B.HistoryPolicyState,
         depth: int,
-        rollout_policies: Dict[str, Policy],
-        rollout_policies_states: Dict[str, PolicyState],
+        rollout_policies: dict[str, Policy],
+        rollout_policies_states: dict[str, PolicyState],
     ) -> float:
         agent_return = 0
         rollout_t = 0
@@ -596,7 +595,7 @@ class INTMCP:
         self,
         action: M.ActType,
         obs: M.ObsType,
-        policy: Union[Policy, OtherAgentPolicy],
+        policy: Policy | OtherAgentPolicy,
         policy_state: PolicyState,
     ) -> PolicyState:
         # this is just a wrapper around policy.get_next_state but also keeps track of
@@ -609,10 +608,10 @@ class INTMCP:
 
     def _update_other_agent_search_policies(
         self,
-        joint_action: Dict[str, Optional[M.ActType]],
-        joint_obs: Dict[str, M.ObsType],
-        pi_state: Dict[str, PolicyState],
-    ) -> Dict[str, PolicyState]:
+        joint_action: dict[str, M.ActType | None],
+        joint_obs: dict[str, M.ObsType],
+        pi_state: dict[str, PolicyState],
+    ) -> dict[str, PolicyState]:
         next_policy_state = {}
         for i in self.model.possible_agents:
             if i == self.agent_id or i not in joint_action:
@@ -743,7 +742,7 @@ class INTMCP:
 
     def _get_joint_action(
         self, hps: B.HistoryPolicyState, ego_action: M.ActType
-    ) -> Dict[str, M.ActType]:
+    ) -> dict[str, M.ActType]:
         agent_actions = {}
         for i in self.model.possible_agents:
             if i == self.agent_id:
@@ -845,7 +844,7 @@ class INTMCP:
         obs_node: ObsNode,
         action: M.ActType,
         obs: M.ObsType,
-        target_node_size: Optional[int] = None,
+        target_node_size: int | None = None,
     ):
         """Reinvigoration belief associated to given history.
 
@@ -885,7 +884,7 @@ class INTMCP:
             parent_belief=parent_obs_node.belief,
             joint_action_fn=self._reinvigorate_action_fn,
             joint_update_fn=self._reinvigorate_update_fn,
-            **{"use_rejected_samples": True},  # used for rejection sampling
+            use_rejected_samples=True,  # used for rejection sampling
         )
 
         reinvig_time = time.time() - start_time
@@ -893,7 +892,7 @@ class INTMCP:
 
     def _reinvigorate_action_fn(
         self, hps: B.HistoryPolicyState, ego_action: M.ActType
-    ) -> Dict[str, M.ActType]:
+    ) -> dict[str, M.ActType]:
         # sample actions using search policy for each agent, rather than using
         # nested tree
         joint_action = {}
@@ -914,9 +913,9 @@ class INTMCP:
     def _reinvigorate_update_fn(
         self,
         hps: B.HistoryPolicyState,
-        joint_action: Dict[str, M.ActType],
-        joint_obs: Dict[str, M.ObsType],
-    ) -> Dict[str, PolicyState]:
+        joint_action: dict[str, M.ActType],
+        joint_obs: dict[str, M.ObsType],
+    ) -> dict[str, PolicyState]:
         return self._update_other_agent_search_policies(
             joint_action, joint_obs, hps.policy_state
         )
@@ -953,7 +952,7 @@ class INTMCP:
         ego_agent_id: str,
         config: MCTSConfig,
         nesting_level: int,
-        search_policies: Optional[Dict[int, Dict[str, SearchPolicy]]],
+        search_policies: dict[int, dict[str, SearchPolicy]] | None,
     ) -> "INTMCP":
         """Initialize a new I-NTMCP datastructure
 

@@ -19,7 +19,7 @@ def main(args):
         # format: <exp_name>_<env_id>[_<agent_id>]_<pop_id>_<seed>_<date>_<time>
         tokens = model_dir_path.name.split("_")
 
-        pop_idx = [i for i, token in enumerate(tokens) if token in ("P0", "P1")][0]
+        pop_idx = next(i for i, token in enumerate(tokens) if token in ("P0", "P1"))
         pop_id = tokens[pop_idx]
         env_idx = pop_idx - 2 if tokens[pop_idx - 1].startswith("i") else pop_idx - 1
 
@@ -30,7 +30,6 @@ def main(args):
 
         seed = int(tokens[pop_idx + 1])
 
-        # format: checkpoint_<update>_BR.pt
         checkpoint_names = list(model_dir_path.glob("*_BR.pt"))
         assert len(checkpoint_names) >= 1
         checkpoint_path = max(checkpoint_names, key=lambda x: int(x.name.split("_")[1]))
