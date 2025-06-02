@@ -41,7 +41,7 @@ dependencies = [
     "matplotlib >=3.7.1",
     "seaborn >=0.12.2",
     "psutil >=5.9.0",
-    "gymnasium >=0.26",
+    "gymnasium ==0.29.1",
 ]
 dynamic = ["version"]
 

@@ -4,8 +4,8 @@ WORKDIR /app
 
 COPY pyproject.toml ./
 COPY setup.py ./
-COPY ./posggym-baselines/__init__.py /app/posggym-baselines/__init__.py
+COPY ./posggym_baselines/__init__.py /app/posggym_baselines/__init__.py
 
-pip install -e .[exps]
+RUN pip install -e .[exps]
 
 COPY . .
