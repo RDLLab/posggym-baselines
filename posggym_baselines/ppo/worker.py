@@ -227,7 +227,6 @@ def run_rollout_worker(  # noqa: PLR0915, PLR0912
                     next_lstm_state[0][:, idxs, :] = lstm_i[0]
                     next_lstm_state[1][:, idxs, :] = lstm_i[1]
                 next_action[idxs] = actions_i
-            print(next_action.shape, step, actions_buf.shape)
             actions_buf[step] = next_action
             logprobs_buf[step] = next_logprobs
             values_buf[step] = next_values
