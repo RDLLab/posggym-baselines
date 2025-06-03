@@ -48,7 +48,7 @@ def split_batch_by_policy(
             partner_policy_idxs[:, :, i] = torch.index_select(
                 batch["policy_idxs"],
                 dim=2,
-                index=torch.Tensor([j for j in range(config.num_agents) if j != i]),
+                index=torch.tensor([j for j in range(config.num_agents) if j != i]),
             )
 
     policy_batches = {}

@@ -82,11 +82,12 @@ def run_rollout_worker(  # noqa: PLR0915, PLR0912
     if config.use_previous_action:
         obs_buf_shape = obs_buf_shape[:-1] + (obs_buf_shape[-1] + one_hot_size,)
     obs_buf = torch.zeros(obs_buf_shape).to(device)
-    # import pdb; pdb.set_trace()
-    print(buf_shape, config.act_space.shape)
-    actions_buf = torch.zeros(
-        (*buf_shape,) if config.act_space.shape is None else config.act_space.shape
-    ).to(device)
+
+    if len(config.act_space.shape or ()) == 0:
+        actions_buf = torch.zeros(buf_shape).long().to(device)
+    else:
+        actions_buf = torch.zeros(buf_shape + config.act_space.shape).to(device)
+
     logprobs_buf = torch.zeros(buf_shape).to(device)
     rewards_buf = torch.zeros(buf_shape).to(device)
     # +1 for bootstrapped value
@@ -306,7 +307,7 @@ def run_rollout_worker(  # noqa: PLR0915, PLR0912
         for policy_id, stats in policy_episode_stats.items():
             if len(stats) == 0:
                 continue
-            stats = torch.Tensor(stats, dtype=torch.float32)
+            stats = torch.tensor(stats, dtype=torch.float32)
             policy_stats[policy_id] = {
                 "mean_episode_return": torch.mean(stats[:, 0]),
                 "min_episode_return": torch.min(stats[:, 0]),
