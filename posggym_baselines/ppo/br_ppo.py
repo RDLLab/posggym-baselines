@@ -8,8 +8,8 @@ It assumes the environment is a POSGGym environment that is wrapped using the
 distribution is part of the environment.
 
 """
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Optional
 
 import numpy as np
 import posggym
@@ -28,11 +28,11 @@ class UniformOtherAgentFn:
     This is a callable class that can be pickled and passed to the workers.
     """
 
-    def __init__(self, agent_policy_ids: Dict[str, List[str]]):
+    def __init__(self, agent_policy_ids: dict[str, list[str]]):
         self.agent_policy_ids = agent_policy_ids
         self.policies = {i: {} for i in agent_policy_ids}
 
-    def __call__(self, model: posggym.POSGModel) -> Dict[str, pga.Policy]:
+    def __call__(self, model: posggym.POSGModel) -> dict[str, pga.Policy]:
         other_agents = {}
         for agent_id in self.agent_policy_ids:
             pi_id = model.rng.choice(self.agent_policy_ids[agent_id])
@@ -47,7 +47,7 @@ class BRPPOConfig(PPOConfig):
     # name of the experiment
     exp_name: str = "br_ppo"
     # other agent policy ids, maps agent id to list of posggym.agents policy ids
-    other_agent_ids: Dict[str, List[str]] = None
+    other_agent_ids: dict[str, list[str]] = None
 
     def __post_init__(self):
         assert self.other_agent_ids is not None
@@ -56,7 +56,7 @@ class BRPPOConfig(PPOConfig):
         env = self.env_creator_fn(self, 0, None)()
         self.num_agents = len(env.possible_agents)
 
-    def load_policies(self, device: Optional[torch.device]) -> Dict[str, PPOModel]:
+    def load_policies(self, device: torch.device | None) -> dict[str, PPOModel]:
         if self.use_lstm:
             model_cls = PPOLSTMModel
             model_kwargs = {
@@ -79,20 +79,20 @@ class BRPPOConfig(PPOConfig):
         policies = {"BR": model_cls(**model_kwargs).to(device)}
         return policies
 
-    def get_policy_partner_distribution(self, policy_id: str) -> Dict[str, float]:
+    def get_policy_partner_distribution(self, policy_id: str) -> dict[str, float]:
         return {"BR": 1.0}
 
-    def sample_episode_policies(self) -> List[str]:
+    def sample_episode_policies(self) -> list[str]:
         return ["BR"] * self.num_agents
 
-    def get_all_policy_ids(self) -> List[str]:
+    def get_all_policy_ids(self) -> list[str]:
         return ["BR"]
 
     @property
-    def train_policies(self) -> List[str]:
+    def train_policies(self) -> list[str]:
         return self.get_all_policy_ids()
 
     def get_other_agent_fn(
         self,
-    ) -> Callable[[posggym.POSGModel], Dict[str, pga.Policy]]:
+    ) -> Callable[[posggym.POSGModel], dict[str, pga.Policy]]:
         return UniformOtherAgentFn(self.other_agent_ids)

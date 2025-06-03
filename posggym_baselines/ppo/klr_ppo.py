@@ -8,7 +8,6 @@ k-1 policy.
 
 import random
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
@@ -29,23 +28,23 @@ class UniformRandomModel(PPOModel):
 
     def get_value(
         self,
-        x: torch.tensor,
-        lstm_state: Optional[Tuple[torch.tensor, torch.tensor]],
-        done: torch.tensor,
-    ) -> torch.tensor:
+        x: torch.Tensor,
+        lstm_state: tuple[torch.Tensor, torch.Tensor] | None,
+        done: torch.Tensor,
+    ) -> torch.Tensor:
         return torch.zeros((x.shape[0], 1))
 
     def get_action(
         self,
-        x: torch.tensor,
-        lstm_state: Optional[Tuple[torch.tensor, torch.tensor]],
-        done: torch.tensor,
-        action: Optional[torch.tensor] = None,
-    ) -> Tuple[
-        torch.tensor,
-        torch.tensor,
-        torch.tensor,
-        Optional[Tuple[torch.tensor, torch.tensor]],
+        x: torch.Tensor,
+        lstm_state: tuple[torch.Tensor, torch.Tensor] | None,
+        done: torch.Tensor,
+        action: torch.Tensor | None = None,
+    ) -> tuple[
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        tuple[torch.Tensor, torch.Tensor] | None,
     ]:
         action_probs = self.action_probs.repeat(x.shape[0], 1)
         probs = Categorical(probs=action_probs)
@@ -60,16 +59,16 @@ class UniformRandomModel(PPOModel):
 
     def get_action_and_value(
         self,
-        x: torch.tensor,
-        lstm_state: Optional[Tuple[torch.tensor, torch.tensor]],
-        done: torch.tensor,
-        action: Optional[torch.tensor] = None,
-    ) -> Tuple[
-        torch.tensor,
-        torch.tensor,
-        torch.tensor,
-        torch.tensor,
-        Optional[Tuple[torch.tensor, torch.tensor]],
+        x: torch.Tensor,
+        lstm_state: tuple[torch.Tensor, torch.Tensor] | None,
+        done: torch.Tensor,
+        action: torch.Tensor | None = None,
+    ) -> tuple[
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        tuple[torch.Tensor, torch.Tensor] | None,
     ]:
         action_probs = self.action_probs.repeat(x.shape[0], 1)
         probs = Categorical(probs=action_probs)
@@ -91,7 +90,7 @@ class KLRPPOConfig(PPOConfig):
     # number of reasoning levels K
     max_reasoning_level: int = 4
     # whether to train best-response policy on top of population
-    include_BR: bool = False
+    include_BR: bool = False  # noqa: N815
 
     def __post_init__(self):
         super().__post_init__()
@@ -101,7 +100,7 @@ class KLRPPOConfig(PPOConfig):
         env = self.env_creator_fn(self, 0, None)()
         self.num_agents = len(env.possible_agents)
 
-    def load_policies(self, device: Optional[torch.device]) -> Dict[str, PPOModel]:
+    def load_policies(self, device: torch.device | None) -> dict[str, PPOModel]:
         if self.use_lstm:
             model_cls = PPOLSTMModel
             model_kwargs = {
@@ -130,7 +129,7 @@ class KLRPPOConfig(PPOConfig):
         policies["random"] = UniformRandomModel(self.act_space.n).to(device)
         return policies  # type: ignore
 
-    def get_policy_partner_distribution(self, policy_id: str) -> Dict[str, float]:
+    def get_policy_partner_distribution(self, policy_id: str) -> dict[str, float]:
         if policy_id == "BR":
             klr_policy_ids = self.get_klr_policy_ids()
             return {
@@ -145,7 +144,7 @@ class KLRPPOConfig(PPOConfig):
             return {"random": 1.0}
         return {f"k_{k-1}": 1.0}
 
-    def sample_episode_policies(self) -> List[str]:
+    def sample_episode_policies(self) -> list[str]:
         # -1 to exclude "random"
         policy_id1 = random.choice(self.get_all_policy_ids()[:-1])
         if policy_id1 == "BR":
@@ -160,17 +159,17 @@ class KLRPPOConfig(PPOConfig):
         random.shuffle(policy_ids)
         return policy_ids
 
-    def get_all_policy_ids(self) -> List[str]:
+    def get_all_policy_ids(self) -> list[str]:
         klr_policy_ids = self.get_klr_policy_ids()
         if self.include_BR:
             klr_policy_ids.append("BR")
         klr_policy_ids.append("random")
         return klr_policy_ids
 
-    def get_klr_policy_ids(self) -> List[str]:
+    def get_klr_policy_ids(self) -> list[str]:
         return [f"k_{i}" for i in range(self.max_reasoning_level + 1)]
 
     @property
-    def train_policies(self) -> List[str]:
+    def train_policies(self) -> list[str]:
         # -1 to exclude "random"
         return self.get_all_policy_ids()[:-1]

@@ -3,19 +3,21 @@ import math
 import os
 import pprint
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 import posggym
 import psutil
 import yaml
 from posggym.agents.wrappers import AgentEnvWrapper
-
+from posggym_baselines.config import BASE_RESULTS_DIR
 from posggym_baselines.planning.config import MCTSConfig
 from posggym_baselines.planning.utils import BeliefStatTracker, PlanningStatTracker
 from posggym_baselines.utils.agent_env_wrapper import UniformOtherAgentFn
+
 
 BASELINE_EXP_DIR = Path(__file__).resolve().parent
 ENV_DATA_DIR = BASELINE_EXP_DIR / "env_data"
@@ -30,7 +32,6 @@ DEFAULT_EXP_TIME_LIMIT = 60 * 60 * 48  # 48 hours
 
 DEFAULT_PLANNING_CONFIG_KWARGS_PUCB = {
     "discount": 0.99,
-    # "search_time_limit": 0.1,   # Set below
     "c": 1.25,
     "truncated": True,
     "action_selection": "pucb",
@@ -56,7 +57,6 @@ DEFAULT_PLANNING_CONFIG_KWARGS_UCB["c"] = math.sqrt(2)
 DEFAULT_PPO_CONFIG = {
     "eval_fns": [],
     # general config
-    # "exp_name": "br_ppo",  # added later
     "seed": 0,
     "cuda": True,
     "torch_deterministic": False,
@@ -102,22 +102,23 @@ DEFAULT_PPO_CONFIG = {
     "lstm_num_layers": 1,
     "trunk_sizes": [64, 64],
     "head_sizes": [64],
+    "log_dir": BASE_RESULTS_DIR,
 }
 
 
 PURSUITEVASION_POLICY_NAMES = {
     0: {
-        "P0": [f"KLR{i}_i0" for i in list(range(5)) + ["BR"]],
+        "P0": [f"KLR{i}_i0" for i in [*list(range(5)), "BR"]],
         "P1": [f"RL{i+1}_i0" for i in range(6)],
     },
     1: {
-        "P0": [f"KLR{i}_i1" for i in list(range(5)) + ["BR"]],
+        "P0": [f"KLR{i}_i1" for i in [*list(range(5)), "BR"]],
         "P1": [f"RL{i+1}_i1" for i in range(6)],
     },
 }
 
 PURSUITEVASION_POLICY_NAMES_TO_IDS = {}
-for agent_id, pop_map in PURSUITEVASION_POLICY_NAMES.items():
+for _agent_id, pop_map in PURSUITEVASION_POLICY_NAMES.items():
     for pop_policy_names in pop_map.values():
         for policy_name in pop_policy_names:
             PURSUITEVASION_POLICY_NAMES_TO_IDS[
@@ -136,31 +137,31 @@ class EnvData:
     other_agent_id: str
 
     # env_kwargs contains `env_id` and `env_kwargs` keys
-    env_kwargs: Dict[str, Dict[str, Any]]
+    env_kwargs: dict[str, dict[str, Any]]
     env_data_dir: Path
 
     # Population data
     # agent_id -> List[policy_id]
-    agents_P0: Dict[str, List[str]]
-    agents_P1: Dict[str, List[str]]
+    agents_P0: dict[str, list[str]]  # noqa: N815
+    agents_P1: dict[str, list[str]]  # noqa: N815
     pop_div_results_file: Path
     # policy names are shorthand for policy IDs
     # pop_id -> List[str]
-    pop_policy_names: Dict[str, List[str]]
-    pop_co_team_names: Dict[str, List[str]]
+    pop_policy_names: dict[str, list[str]]
+    pop_co_team_names: dict[str, list[str]]
     # map from policy_name -> policy_id
-    policy_name_to_id: Dict[str, str]
+    policy_name_to_id: dict[str, str]
 
     # RL data
     # [P0, P1] -> [seed] -> model_file
-    br_model_files: Dict[str, Dict[int, Path]]
+    br_model_files: dict[str, dict[int, Path]]
     rl_br_results_file: Path
-    rl_br_training_results_files: Dict[str, Path]
+    rl_br_training_results_files: dict[str, Path]
 
     # Planning data
     # Meta policy pop_id -> meta_policy_type -> meta_policy
     # [P0, P1] -> [greedy, softmax, uniform] -> meta_policy
-    meta_policy: Dict[str, Dict[str, Dict[str, Dict[str, float]]]]
+    meta_policy: dict[str, dict[str, dict[str, dict[str, float]]]]
     # Experiment results
     planning_results_file: Path
     planning_summary_results_file: Path
@@ -187,14 +188,14 @@ def get_env_data(full_env_id: str):
     env_data_path = ENV_DATA_DIR / full_env_id
 
     env_kwargs_file = env_data_path / "env_kwargs.yaml"
-    with open(env_kwargs_file, "r") as f:
+    with open(env_kwargs_file) as f:
         env_kwargs = yaml.safe_load(f)
 
     # Population Data
-    with open(env_data_path / "agents_P0.yaml", "r") as f:
+    with open(env_data_path / "agents_P0.yaml") as f:
         agents_P0 = yaml.safe_load(f)
 
-    with open(env_data_path / "agents_P1.yaml", "r") as f:
+    with open(env_data_path / "agents_P1.yaml") as f:
         agents_P1 = yaml.safe_load(f)
 
     other_agent_id = next(iter(agents_P0.keys()))
@@ -215,8 +216,8 @@ def get_env_data(full_env_id: str):
             pop_co_team_names[pop_id] = PURSUITEVASION_POLICY_NAMES[1][pop_id]
         policy_name_to_id = PURSUITEVASION_POLICY_NAMES_TO_IDS
     else:
-        for pop_id, pop in zip(["P0", "P1"], [agents_P0, agents_P1]):
-            policy_ids = list(pop.values())[0]
+        for pop_id, pop in zip(["P0", "P1"], [agents_P0, agents_P1], strict=False):
+            policy_ids = next(iter(pop.values()))
             policy_names = []
             for policy_id in policy_ids:
                 policy_name = policy_id.split("/")[-1].split("-v")[0]
@@ -238,7 +239,7 @@ def get_env_data(full_env_id: str):
 
     # Planninn Data
     meta_policy_file = env_data_path / "meta_policy.yaml"
-    with open(meta_policy_file, "r") as f:
+    with open(meta_policy_file) as f:
         meta_policy = yaml.safe_load(f)
 
     return EnvData(
@@ -266,7 +267,7 @@ def get_env_data(full_env_id: str):
     )
 
 
-def load_all_env_data() -> Dict[str, EnvData]:
+def load_all_env_data() -> dict[str, EnvData]:
     """Load data for all environments."""
     all_env_data = {}
     full_env_ids = sorted([f.name for f in ENV_DATA_DIR.glob("*")])
@@ -282,20 +283,20 @@ class PlanningExpParams:
     """Parameters for running planning experiments."""
 
     # stuff used for running experiments
-    env_kwargs: Dict
-    agent_id: Optional[str]
+    env_kwargs: dict
+    agent_id: str | None
     config: MCTSConfig
     # kwargs and fn for initializing planner
     planner_init_fn: Callable[[posggym.POSGModel, "PlanningExpParams"], Any]
-    planner_kwargs: Dict
+    planner_kwargs: dict
     # other agent policies that planning agent is evaluated against
-    test_other_agent_policy_ids: Dict[str, List[str]]
+    test_other_agent_policy_ids: dict[str, list[str]]
     # number of episodes
     num_episodes: int
     # time limit for experiment
     exp_time_limit: int
     # whether to track belief statistics (can slow down experiment time)
-    belief_stats_to_track: List[str]
+    belief_stats_to_track: list[str]
     track_per_step_belief_stats: bool
 
     # experiment details for saving results
@@ -310,7 +311,7 @@ class PlanningExpParams:
     episode_results_file: str = field(init=False)
     exp_args_file: Path = field(init=False)
     exp_log_file: Path = field(init=False)
-    episode_results_heads: List[str] = field(init=False)
+    episode_results_heads: list[str] = field(init=False)
     exp_start_time: float = field(init=False)
 
     def __post_init__(self):
@@ -328,7 +329,8 @@ class PlanningExpParams:
             "return",
             "discounted_return",
             "time",
-        ] + PlanningStatTracker.STAT_KEYS
+            *PlanningStatTracker.STAT_KEYS,
+        ]
 
         if self.track_per_step_belief_stats:
             step_limit = posggym.spec(self.env_kwargs["env_id"]).max_episode_steps
@@ -398,7 +400,7 @@ class PlanningExpParams:
             f.write(f"Finish Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
             f.write(f"Total Time Taken={hours:02.0f}:{minutes:02.0f}:{seconds:02.0f}\n")
 
-    def write_episode_results(self, results: Dict):
+    def write_episode_results(self, results: dict):
         with open(self.episode_results_file, "a") as f:
             writer = csv.DictWriter(f, fieldnames=self.episode_results_heads)
             writer.writerow(results)

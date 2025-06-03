@@ -1,5 +1,4 @@
 """Actor and Critic network for PPO algorithm."""
-from typing import List, Optional, Tuple
 
 import numpy as np
 import torch
@@ -22,10 +21,10 @@ class PPOModel(nn.Module):
 
     def get_value(
         self,
-        x: torch.tensor,
-        lstm_state: Optional[Tuple[torch.tensor, torch.tensor]],
-        done: torch.tensor,
-    ) -> torch.tensor:
+        x: torch.Tensor,
+        lstm_state: tuple[torch.Tensor, torch.Tensor] | None,
+        done: torch.Tensor,
+    ) -> torch.Tensor:
         """Get the value from the critic.
 
         B = batch_size
@@ -54,15 +53,15 @@ class PPOModel(nn.Module):
 
     def get_action(
         self,
-        x: torch.tensor,
-        lstm_state: Optional[Tuple[torch.tensor, torch.tensor]],
-        done: torch.tensor,
-        action: Optional[torch.tensor] = None,
-    ) -> Tuple[
-        torch.tensor,
-        torch.tensor,
-        torch.tensor,
-        Optional[Tuple[torch.tensor, torch.tensor]],
+        x: torch.Tensor,
+        lstm_state: tuple[torch.Tensor, torch.Tensor] | None,
+        done: torch.Tensor,
+        action: torch.Tensor | None = None,
+    ) -> tuple[
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        tuple[torch.Tensor, torch.Tensor] | None,
     ]:
         """Get action from the actor.
 
@@ -98,16 +97,16 @@ class PPOModel(nn.Module):
 
     def get_action_and_value(
         self,
-        x: torch.tensor,
-        lstm_state: Optional[Tuple[torch.tensor, torch.tensor]],
-        done: torch.tensor,
-        action: Optional[torch.tensor] = None,
-    ) -> Tuple[
-        torch.tensor,
-        torch.tensor,
-        torch.tensor,
-        torch.tensor,
-        Optional[Tuple[torch.tensor, torch.tensor]],
+        x: torch.Tensor,
+        lstm_state: tuple[torch.Tensor, torch.Tensor] | None,
+        done: torch.Tensor,
+        action: torch.Tensor | None = None,
+    ) -> tuple[
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        tuple[torch.Tensor, torch.Tensor] | None,
     ]:
         """Get action from the actor and value from the critic.
 
@@ -156,17 +155,19 @@ class PPOLSTMModel(PPOModel):
     def __init__(
         self,
         input_size: int,
-        num_actions: int,
-        trunk_sizes: List[int],
+        num_actions: int | list[int],
+        trunk_sizes: list[int],
         lstm_size: int,
         lstm_layers: int,
-        head_sizes: List[int],
+        head_sizes: list[int],
+        use_residual_lstm: bool,
     ):
         super().__init__()
         self.input_size = input_size
         self.num_actions = num_actions
         self.lstm_size = lstm_size
         self.lstm_layers = lstm_layers
+        self.use_residual_lstm = use_residual_lstm
 
         prev_size = input_size
         trunk = []
@@ -201,7 +202,11 @@ class PPOLSTMModel(PPOModel):
             ]
             prev_size = size
 
-        actor.append(layer_init(nn.Linear(prev_size, num_actions), std=0.01))
+        if isinstance(num_actions, list):
+            actor.append(layer_init(nn.Linear(prev_size, sum(num_actions)), std=0.01))
+        else:
+            actor.append(layer_init(nn.Linear(prev_size, num_actions), std=0.01))
+
         self.actor = nn.Sequential(*actor)
 
         critic.append(
@@ -211,10 +216,10 @@ class PPOLSTMModel(PPOModel):
 
     def get_states(
         self,
-        x: torch.tensor,
-        lstm_state: Tuple[torch.tensor, torch.tensor],
-        done: torch.tensor,
-    ) -> Tuple[torch.tensor, Tuple[torch.tensor, torch.tensor]]:
+        x: torch.Tensor,
+        lstm_state: tuple[torch.Tensor, torch.Tensor],
+        done: torch.Tensor,
+    ) -> tuple[torch.Tensor, tuple[torch.Tensor, torch.Tensor]]:
         """Get the next states from the LSTM.
 
         B = batch_size (typically the number of parallel environments contained in the
@@ -254,7 +259,7 @@ class PPOLSTMModel(PPOModel):
         hidden = hidden.reshape((-1, batch_size, self.lstm.input_size))
         done = done.reshape((-1, batch_size))
         new_hidden = []
-        for h, d in zip(hidden, done):
+        for h, d in zip(hidden, done, strict=False):
             h, lstm_state = self.lstm(
                 h.unsqueeze(0),
                 (
@@ -265,66 +270,108 @@ class PPOLSTMModel(PPOModel):
             new_hidden += [h]
 
         new_hidden = torch.flatten(torch.cat(new_hidden), 0, 1)
+        if self.use_residual_lstm:
+            new_hidden += hidden.reshape(new_hidden.shape)
         return new_hidden, lstm_state
 
     def get_value(
         self,
-        x: torch.tensor,
-        lstm_state: Optional[Tuple[torch.tensor, torch.tensor]],
-        done: torch.tensor,
-    ) -> torch.tensor:
+        x: torch.Tensor,
+        lstm_state: tuple[torch.Tensor, torch.Tensor] | None,
+        done: torch.Tensor,
+    ) -> torch.Tensor:
         assert lstm_state is not None
         hidden, _ = self.get_states(x, lstm_state, done)
         return self.critic(hidden)
 
     def get_action(
         self,
-        x: torch.tensor,
-        lstm_state: Optional[Tuple[torch.tensor, torch.tensor]],
-        done: torch.tensor,
-        action: Optional[torch.tensor] = None,
-    ) -> Tuple[
-        torch.tensor,
-        torch.tensor,
-        torch.tensor,
-        Optional[Tuple[torch.tensor, torch.tensor]],
+        x: torch.Tensor,
+        lstm_state: tuple[torch.Tensor, torch.Tensor] | None,
+        done: torch.Tensor,
+        action: torch.Tensor | None = None,
+    ) -> tuple[
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        tuple[torch.Tensor, torch.Tensor] | None,
     ]:
         assert lstm_state is not None
         hidden, lstm_state = self.get_states(x, lstm_state, done)
         logits = self.actor(hidden)
+
+        def transpose(x):
+            return x
+
+        def transposeSum(x):
+            return x
+
+        if isinstance(self.num_actions, list):
+            # We split this in to batches for running through categorical
+            # One batch for each agent
+            logits = logits.view(
+                logits.shape[0], len(self.num_actions), self.num_actions[0]
+            ).transpose(1, 0)
+
+            def transpose(x):
+                return x.T
+
+            def transposeSum(x):
+                return x.T.sum(1)
+
         probs = Categorical(logits=logits)
-        if action is None:
-            action = probs.sample()
+
+        action = probs.sample() if action is None else transpose(action)
         return (
-            action,
-            probs.log_prob(action),
-            probs.entropy(),
+            transpose(action),
+            transposeSum(probs.log_prob(action)),
+            transposeSum(probs.entropy()),
             lstm_state,
         )
 
     def get_action_and_value(
         self,
-        x: torch.tensor,
-        lstm_state: Optional[Tuple[torch.tensor, torch.tensor]],
-        done: torch.tensor,
-        action: Optional[torch.tensor] = None,
-    ) -> Tuple[
-        torch.tensor,
-        torch.tensor,
-        torch.tensor,
-        torch.tensor,
-        Optional[Tuple[torch.tensor, torch.tensor]],
+        x: torch.Tensor,
+        lstm_state: tuple[torch.Tensor, torch.Tensor] | None,
+        done: torch.Tensor,
+        action: torch.Tensor | None = None,
+    ) -> tuple[
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        tuple[torch.Tensor, torch.Tensor] | None,
     ]:
         assert lstm_state is not None
         hidden, lstm_state = self.get_states(x, lstm_state, done)
         logits = self.actor(hidden)
+
+        def transpose(x):
+            return x
+
+        def transposeSum(x):
+            return x
+
+        if isinstance(self.num_actions, list):
+            # We split this in to batches for running through categorical
+            # One batch for each agent
+            logits = logits.view(
+                logits.shape[0], len(self.num_actions), self.num_actions[0]
+            ).transpose(1, 0)
+
+            def transpose(x):
+                return x.T
+
+            def transposeSum(x):
+                return x.T.sum(1)
+
         probs = Categorical(logits=logits)
-        if action is None:
-            action = probs.sample()
+        action = probs.sample() if action is None else transpose(action)
+
         return (
-            action,
-            probs.log_prob(action),
-            probs.entropy(),
+            transpose(action),
+            transposeSum(probs.log_prob(action)),
+            transposeSum(probs.entropy()),
             self.critic(hidden),
             lstm_state,
         )
@@ -342,8 +389,8 @@ class PPOMLPModel(PPOModel):
         self,
         input_size: int,
         num_actions: int,
-        trunk_sizes: List[int],
-        head_sizes: List[int],
+        trunk_sizes: list[int],
+        head_sizes: list[int],
     ):
         super().__init__()
         self.input_size = input_size
@@ -382,24 +429,24 @@ class PPOMLPModel(PPOModel):
 
     def get_value(
         self,
-        x: torch.tensor,
-        lstm_state: Optional[Tuple[torch.tensor, torch.tensor]],
-        done: torch.tensor,
-    ) -> torch.tensor:
+        x: torch.Tensor,
+        lstm_state: tuple[torch.Tensor, torch.Tensor] | None,
+        done: torch.Tensor,
+    ) -> torch.Tensor:
         hidden = self.trunk(x)
         return self.critic(hidden)
 
     def get_action(
         self,
-        x: torch.tensor,
-        lstm_state: Optional[Tuple[torch.tensor, torch.tensor]],
-        done: torch.tensor,
-        action: Optional[torch.tensor] = None,
-    ) -> Tuple[
-        torch.tensor,
-        torch.tensor,
-        torch.tensor,
-        Optional[Tuple[torch.tensor, torch.tensor]],
+        x: torch.Tensor,
+        lstm_state: tuple[torch.Tensor, torch.Tensor] | None,
+        done: torch.Tensor,
+        action: torch.Tensor | None = None,
+    ) -> tuple[
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        tuple[torch.Tensor, torch.Tensor] | None,
     ]:
         hidden = self.trunk(x)
         logits = self.actor(hidden)
@@ -415,16 +462,16 @@ class PPOMLPModel(PPOModel):
 
     def get_action_and_value(
         self,
-        x: torch.tensor,
-        lstm_state: Optional[Tuple[torch.tensor, torch.tensor]],
-        done: torch.tensor,
-        action: Optional[torch.tensor] = None,
-    ) -> Tuple[
-        torch.tensor,
-        torch.tensor,
-        torch.tensor,
-        torch.tensor,
-        Optional[Tuple[torch.tensor, torch.tensor]],
+        x: torch.Tensor,
+        lstm_state: tuple[torch.Tensor, torch.Tensor] | None,
+        done: torch.Tensor,
+        action: torch.Tensor | None = None,
+    ) -> tuple[
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        torch.Tensor,
+        tuple[torch.Tensor, torch.Tensor] | None,
     ]:
         hidden = self.trunk(x)
         logits = self.actor(hidden)

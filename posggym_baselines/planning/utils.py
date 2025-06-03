@@ -1,5 +1,5 @@
 from collections import namedtuple
-from typing import Dict, List, Optional
+from typing import ClassVar
 
 import numpy as np
 import posggym.agents as pga
@@ -8,6 +8,7 @@ from posggym.agents.wrappers import AgentEnvWrapper
 from posggym.utils.history import AgentHistory
 
 from posggym_baselines.planning.other_policy import OtherAgentPolicy
+
 
 KnownBounds = namedtuple("KnownBounds", ["min", "max"])
 
@@ -18,7 +19,7 @@ class MinMaxStats:
     Ref: MuZero pseudocode
     """
 
-    def __init__(self, known_bounds: Optional[KnownBounds]):
+    def __init__(self, known_bounds: KnownBounds | None):
         if known_bounds:
             self.maximum = known_bounds.max
             self.minimum = known_bounds.min
@@ -46,7 +47,7 @@ class PlanningStatTracker:
     """Tracks MCTS planning statistics."""
 
     # The list of keys to track from the policies.statistics property
-    STAT_KEYS = [
+    STAT_KEYS: ClassVar[list[str]] = [
         "search_time",
         "update_time",
         "reinvigoration_time",
@@ -61,18 +62,18 @@ class PlanningStatTracker:
     ]
 
     # The list of keys to track max values for, otherwise we track mean values
-    MAX_STATS = {"mem_usage"}
+    MAX_STATS: ClassVar[set[str]] = {"mem_usage"}
 
     def __init__(self, planner, track_overall: bool = True):
         self.planner = planner
         self.track_overall = track_overall
 
         self._current_steps = 0
-        self._current_stats: Dict[str, List[float]] = {k: [] for k in self.STAT_KEYS}
+        self._current_stats: dict[str, list[float]] = {k: [] for k in self.STAT_KEYS}
 
         self._num_episodes = 0
-        self._all_steps: List[int] = []
-        self._all_stats: Dict[str, List[float]] = {k: [] for k in self.STAT_KEYS}
+        self._all_steps: list[int] = []
+        self._all_stats: dict[str, list[float]] = {k: [] for k in self.STAT_KEYS}
 
         self.reset()
 
@@ -112,7 +113,7 @@ class PlanningStatTracker:
         self._current_steps = 0
         self._current_stats = {k: [] for k in self.STAT_KEYS}
 
-    def get_episode(self) -> Dict[str, float]:
+    def get_episode(self) -> dict[str, float]:
         """Get statistics for current episode."""
         stats = {}
         for key, step_times in self._current_stats.items():
@@ -125,7 +126,7 @@ class PlanningStatTracker:
             stats[key] = val
         return stats
 
-    def get(self) -> Dict[str, float]:
+    def get(self) -> dict[str, float]:
         """Get statistics for all episodes."""
         stats = {}
         for key, values in self._all_stats.items():
@@ -166,15 +167,22 @@ class BeliefStatTracker:
 
     """
 
-    TRACKABLE_BELIEF_STATS = ["policy", "action", "state", "history"]
+    TRACKABLE_BELIEF_STATS: ClassVar[list[str]] = [
+        "policy",
+        "action",
+        "state",
+        "history",
+    ]
 
     def __init__(
         self,
         planner,
         env: AgentEnvWrapper,
         track_per_step: bool = False,
-        stats_to_track: List[str] = ["policy", "action", "state", "history"],
+        stats_to_track: list[str] | None = None,
     ):
+        if stats_to_track is None:
+            stats_to_track = ["policy", "action", "state", "history"]
         assert all(k in self.TRACKABLE_BELIEF_STATS for k in stats_to_track)
         if any(k in stats_to_track for k in ["policy", "action"]):
             assert all(
@@ -208,8 +216,8 @@ class BeliefStatTracker:
 
     @classmethod
     def get_stat_keys(
-        cls, stats_to_track: List[str], track_per_step: bool, step_limit: Optional[int]
-    ) -> List[str]:
+        cls, stats_to_track: list[str], track_per_step: bool, step_limit: int | None
+    ) -> list[str]:
         """Get list of stat keys."""
         assert all(k in cls.TRACKABLE_BELIEF_STATS for k in stats_to_track)
         keys = []
@@ -272,7 +280,7 @@ class BeliefStatTracker:
         self._current_steps = 0
         self._current_stats = {k: [] for k in self.stats_to_track}
 
-    def get_episode(self) -> Dict[str, float]:
+    def get_episode(self) -> dict[str, float]:
         """Get statistics for current episode."""
         stats = {}
         for k, v in self._current_stats.items():
@@ -296,7 +304,7 @@ class BeliefStatTracker:
             state_count += int(hps.state == state)
         return state_count / self.planner.root.belief.size()
 
-    def get_other_history_accuracy(self, histories: Dict[str, AgentHistory]) -> float:
+    def get_other_history_accuracy(self, histories: dict[str, AgentHistory]) -> float:
         """Get belief accuracy of other agent's history."""
         h_count = 0
         for hps in self.planner.root.belief.particles:
@@ -306,7 +314,7 @@ class BeliefStatTracker:
                 h_count += 1
         return h_count / self.planner.root.belief.size()
 
-    def get_other_policy_accuracy(self, policies: Dict[str, pga.Policy]) -> float:
+    def get_other_policy_accuracy(self, policies: dict[str, pga.Policy]) -> float:
         """Get belief accuracy of other agent's policy ID/type."""
         pi_count = 0
         for hps in self.planner.root.belief.particles:
@@ -323,7 +331,7 @@ class BeliefStatTracker:
             pi_count += int(correct)
         return pi_count / self.planner.root.belief.size()
 
-    def get_other_action_accuracy(self, actions: Dict[str, M.ActType]) -> float:
+    def get_other_action_accuracy(self, actions: dict[str, M.ActType]) -> float:
         """Get belief accuracy of other agent's action."""
         a_prob_sum = 0
         for hps in self.planner.root.belief.particles:

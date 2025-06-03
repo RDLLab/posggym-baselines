@@ -3,16 +3,17 @@
 import contextlib
 import time
 from datetime import timedelta
-from multiprocessing.queues import Empty, Full
+from multiprocessing.queues import Empty, Full, JoinableQueue
+from multiprocessing.synchronize import Event
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, List, Optional, Union
+from typing import TYPE_CHECKING
 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.multiprocessing as mp
-import torch.nn as nn
-import torch.optim as optim
+from gymnasium import spaces
+from torch import nn, optim
 
 import posggym_baselines.ppo.utils as ppo_utils
 from posggym_baselines.ppo.eval import run_eval_worker
@@ -47,11 +48,11 @@ class PPOLearner:
 
     def train(
         self,
-        worker_recv_queues: List[mp.JoinableQueue],
-        worker_send_queues: List[mp.JoinableQueue],
-        eval_recv_queue: Optional[mp.JoinableQueue],
-        eval_send_queue: Optional[mp.JoinableQueue],
-        termination_event: mp.Event,
+        worker_recv_queues: list[JoinableQueue],
+        worker_send_queues: list[JoinableQueue],
+        eval_recv_queue: JoinableQueue | None,
+        eval_send_queue: JoinableQueue | None,
+        termination_event: Event,
     ):
         """Run PPO training.
 
@@ -149,7 +150,7 @@ class PPOLearner:
             self.writer.log_scalar("charts/update", update, global_step)
             self.writer.log_scalar(
                 "charts/learning_rate",
-                list(self.optimizers.values())[0].param_groups[0]["lr"],
+                next(iter(self.optimizers.values())).param_groups[0]["lr"],
                 global_step,
             )
             self.writer.log_scalar("charts/SPS", sps, global_step)
@@ -176,6 +177,12 @@ class PPOLearner:
                 # display progress in stdout
                 training_time = timedelta(seconds=int(time.time() - train_start_time))
                 output = [f"learner: time={training_time} global_step={global_step}"]
+
+                updates_left = self.config.num_updates - update
+                avg_time_per_update = training_time / update
+                time_left_seconds = avg_time_per_update * updates_left
+                output += [f"remaining: time={time_left_seconds}"]
+
                 output += [
                     f"  {policy_id}: {policy_return:.2f}"
                     for policy_id, policy_return in policy_returns.items()
@@ -215,7 +222,7 @@ class PPOLearner:
 
             update += 1
 
-    def update(self, batch: Dict[str, torch.tensor], global_step: int):
+    def update(self, batch: dict[str, torch.Tensor], global_step: int):
         """Update the policies using the batch of experience."""
         # calculate advantages and monte-carlo returns
         rewards_buf, dones_buf, values_buf = (
@@ -259,6 +266,11 @@ class PPOLearner:
                 policy_batches, self.config
             )
 
+        one_hot_size = (
+            self.config.act_space.n
+            if isinstance(self.config.act_space, spaces.Discrete)
+            else self.config.act_space.nvec.sum()
+        )
         # update each policy
         for policy_id in self.config.train_policies:
             if policy_id not in policy_batches or len(policy_batches[policy_id]) == 0:
@@ -272,13 +284,19 @@ class PPOLearner:
             # flatten the batch
             b_obs = (
                 policy_batch["obs"]
-                .reshape((-1,) + self.config.obs_space.shape)
+                .reshape(
+                    (
+                        -1,
+                        self.config.obs_space.shape[0]
+                        + (one_hot_size if self.config.use_previous_action else 0),
+                    )
+                )
                 .to(self.config.device)
             )
             b_logprobs = policy_batch["logprobs"].reshape(-1).to(self.config.device)
             b_actions = (
                 policy_batch["actions"]
-                .reshape((-1,) + self.config.act_space.shape)
+                .reshape((-1, *self.config.act_space.shape))
                 .to(self.config.device)
             )
             b_advantages = policy_batch["advantages"].reshape(-1).to(self.config.device)
@@ -297,7 +315,7 @@ class PPOLearner:
             clipfracs = []
             approx_kl, old_approx_kl, unclipped_grad_norm = 0, 0, 0
             entropy_loss, pg_loss, v_loss, loss = 0, 0, 0, 0
-            for epoch in range(self.config.update_epochs):
+            for _epoch in range(self.config.update_epochs):
                 np.random.shuffle(seq_indxs)
 
                 # minibatch update, using data from randomized subset of sequences
@@ -408,9 +426,9 @@ class PPOLearner:
     def evaluate(
         self,
         global_step: int,
-        eval_recv_queue: mp.JoinableQueue,
-        eval_send_queue: mp.JoinableQueue,
-        termination_event: mp.Event,
+        eval_recv_queue: JoinableQueue,
+        eval_send_queue: JoinableQueue,
+        termination_event: Event,
         final_eval: bool,
     ):
         """Run evaluation of policies."""
@@ -434,7 +452,6 @@ class PPOLearner:
                 if not reported_wait:
                     print("learner: Eval queue full, waiting for eval to finish")
                     reported_wait = True
-                pass
 
         # check if previous eval finished and log results
         evals_to_log = True
@@ -498,20 +515,21 @@ class PPOLearner:
 def load_policies(
     config: "PPOConfig",
     save_dir: Path,
-    checkpoint: Optional[int] = None,
-    device: Optional[Union[str, torch.device]] = None,
-) -> Dict[str, PPOModel]:
+    checkpoint: int | None = None,
+    policies: dict[str, PPOModel] | None = None,
+    device: str | torch.device | None = None,
+) -> dict[str, PPOModel]:
     """Load policies from checkpoint files.
 
     If checkpoint is None, load the latest checkpoint.
     """
-    checkpoint_files = save_dir.glob("checkpoint*.pt")
-    if not checkpoint_files:
+    checkpoint_files = list(save_dir.glob("checkpoint*.pt"))
+    if len(checkpoint_files) == 0:
         raise ValueError(f"No checkpoint files found in {save_dir}")
 
     if not checkpoint:
         checkpoint_files = sorted(checkpoint_files, key=lambda x: x.name)
-        checkpoint = int(checkpoint_files[-1].split("_")[1])
+        checkpoint = int(checkpoint_files[-1].name.split("_")[1])
 
     policy_checkpoint_files = {}
     for f in checkpoint_files:
@@ -519,10 +537,13 @@ def load_policies(
         if tokens[1] != str(checkpoint):
             continue
         policy_id = "_".join(tokens[2:-1] + tokens[-1].split(".")[:1])
-        policy_checkpoint_files[policy_id] = save_dir / f
+        policy_checkpoint_files[policy_id] = f
 
     device = device or config.device
-    policies = config.load_policies(device=device)
+
+    if policies is None:
+        policies = config.load_policies(device=device, checkpoint=checkpoint)
+
     for policy_id, policy in policies.items():
         checkpoint_file = policy_checkpoint_files[policy_id]
         checkpoint_map = torch.load(checkpoint_file, map_location=device)
@@ -533,11 +554,11 @@ def load_policies(
 
 def run_learner(
     config: "PPOConfig",
-    worker_recv_queues: List[mp.JoinableQueue],
-    worker_send_queues: List[mp.JoinableQueue],
-    eval_recv_queue: Optional[mp.JoinableQueue],
-    eval_send_queue: Optional[mp.JoinableQueue],
-    termination_event: mp.Event,
+    worker_recv_queues: list[JoinableQueue],
+    worker_send_queues: list[JoinableQueue],
+    eval_recv_queue: JoinableQueue | None,
+    eval_send_queue: JoinableQueue | None,
+    termination_event: Event,
 ):
     """Run PPO learner process.
 

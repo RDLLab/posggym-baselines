@@ -7,6 +7,12 @@ import seaborn as sns
 from torch.utils.tensorboard import SummaryWriter
 
 
+try:
+    import wandb
+except ImportError:
+    wandb = None
+
+
 class Logger(abc.ABC):
     """Abstract class for logging training stats and other outputs."""
 
@@ -33,9 +39,9 @@ class Logger(abc.ABC):
     def upload_videos(self, step: int):
         """Upload any new video files in config.video_dir."""
 
+    @abc.abstractmethod
     def close(self):
         """Close the logger."""
-        pass
 
 
 class TensorBoardLogger(Logger):
@@ -51,7 +57,8 @@ class TensorBoardLogger(Logger):
         self.track_wandb = config.track_wandb
 
         if self.track_wandb:
-            import wandb
+            if wandb is None:
+                raise ImportError("Weights and Biases not installed :(")
 
             wandb.init(
                 project=config.wandb_project,
@@ -66,8 +73,9 @@ class TensorBoardLogger(Logger):
         self.writer = SummaryWriter(log_dir=self.log_dir)
         self.writer.add_text(
             "hyperparameters",
-            "|param|value|\n|-|-|\n%s"
-            % ("\n".join([f"|{key}|{value}|" for key, value in vars(config).items()])),
+            "|param|value|\n|-|-|\n{}".format(
+                "\n".join([f"|{key}|{value}|" for key, value in vars(config).items()])
+            ),
         )
 
         self.uploaded_video_files = set()
@@ -99,7 +107,7 @@ class TensorBoardLogger(Logger):
                     wandb.log(  # type:ignore
                         {
                             "video": wandb.Video(  # type:ignore
-                                str(filename)
+                                str(filename.absolute())
                             )
                         },
                     )
@@ -108,7 +116,8 @@ class TensorBoardLogger(Logger):
     def close(self):
         self.writer.close()
         if self.config.track_wandb:
-            import wandb
+            if wandb is None:
+                raise ImportError("Weights and Biases not installed :(")
 
             wandb.finish()
 

@@ -1,7 +1,6 @@
 import math
 import random
 import time
-from typing import Dict, Optional, Tuple
 
 import posggym.model as M
 from posggym.agents.policy import Policy, PolicyState
@@ -23,7 +22,7 @@ class POTMMCP(MCTS):
         model: M.POSGModel,
         agent_id: str,
         config: MCTSConfig,
-        other_agent_policies: Dict[str, OtherAgentPolicy],
+        other_agent_policies: dict[str, OtherAgentPolicy],
         search_policy: "POTMMCPMetaPolicy",
     ):
         super().__init__(model, agent_id, config, other_agent_policies, search_policy)
@@ -209,7 +208,7 @@ class POTMMCP(MCTS):
         obs_node: ObsNode,
         depth: int,
         search_policy: Policy,
-    ) -> Tuple[float, int]:
+    ) -> tuple[float, int]:
         if depth > self.config.depth_limit or obs_node.t > self.step_limit:
             return 0, depth
 
@@ -330,8 +329,8 @@ class POTMMCPMetaPolicy(SearchPolicy):
         self,
         model: M.POSGModel,
         agent_id: str,
-        policies: Dict[str, Policy],
-        meta_policy: Dict[str, Dict[str, float]],
+        policies: dict[str, Policy],
+        meta_policy: dict[str, dict[str, float]],
     ):
         super().__init__(model, agent_id, "POTMMCPMetaPolicy")
         assert len(model.possible_agents) == 2, "Currently only supports 2 agents"
@@ -340,7 +339,7 @@ class POTMMCPMetaPolicy(SearchPolicy):
             assert all(k in policies for k in meta_policy_dist)
             assert abs(sum(meta_policy_dist.values()) - 1) < 1e-6
 
-        self.other_agent_id = [i for i in model.possible_agents if i != agent_id][0]
+        self.other_agent_id = next(i for i in model.possible_agents if i != agent_id)
         self.policies = policies
         self.meta_policy = meta_policy
         self.action_space = list(range(model.action_spaces[agent_id].n))
@@ -350,7 +349,7 @@ class POTMMCPMetaPolicy(SearchPolicy):
 
     def get_next_state(
         self,
-        action: Optional[M.ActType],
+        action: M.ActType | None,
         obs: M.ObsType,
         state: PolicyState,
     ) -> PolicyState:
@@ -365,7 +364,7 @@ class POTMMCPMetaPolicy(SearchPolicy):
             "sample_policy to sample a policy and then sample an action from that."
         )
 
-    def get_pi(self, state: PolicyState) -> Dict[M.ActType, float]:
+    def get_pi(self, state: PolicyState) -> dict[M.ActType, float]:
         raise NotImplementedError(
             "POTMMCPMetaPolicy does not support action sampling. Instead, use "
             "sample_policy to sample a policy and then get the action distribution "
@@ -378,7 +377,7 @@ class POTMMCPMetaPolicy(SearchPolicy):
             "sample_policy to sample a policy and then get the value from that."
         )
 
-    def sample_policy(self, other_agent_policy_state: Dict[str, PolicyState]) -> Policy:
+    def sample_policy(self, other_agent_policy_state: dict[str, PolicyState]) -> Policy:
         """Sample policy to use as search policy given policies of other agents."""
         meta_policy_dist = self.meta_policy[
             other_agent_policy_state[self.other_agent_id]["policy_id"]
@@ -390,9 +389,9 @@ class POTMMCPMetaPolicy(SearchPolicy):
 
     def get_expected_action_probs(
         self,
-        other_agent_policy_dist: Optional[Dict[str, float]],
+        other_agent_policy_dist: dict[str, float] | None,
         policy_state: PolicyState,
-    ) -> Dict[M.ActType, float]:
+    ) -> dict[M.ActType, float]:
         """Get action probabilities from distribution over other agent policies.
 
         If `other_agent_policy_dist` is None, then assume uniform prior over other
@@ -436,7 +435,7 @@ class POTMMCPMetaPolicy(SearchPolicy):
 
     @staticmethod
     def load_posggym_agents_meta_policy(
-        model: M.POSGModel, agent_id: str, meta_policy: Dict[str, Dict[str, float]]
+        model: M.POSGModel, agent_id: str, meta_policy: dict[str, dict[str, float]]
     ) -> "POTMMCPMetaPolicy":
         """Load POTMMCPMetaPolicy from posggym agents meta-policy.
 
@@ -460,8 +459,8 @@ class POTMMCPMetaPolicy(SearchPolicy):
 
     @staticmethod
     def get_uniform_meta_policy(
-        pairwise_returns: Dict[str, Dict[str, float]]
-    ) -> Dict[str, Dict[str, float]]:
+        pairwise_returns: dict[str, dict[str, float]]
+    ) -> dict[str, dict[str, float]]:
         """Get uniform meta-policy from pairwise returns.
 
         `pairwise_returns` is a dictionary mapping from ego agent policy ID to a
@@ -483,8 +482,8 @@ class POTMMCPMetaPolicy(SearchPolicy):
 
     @staticmethod
     def get_greedy_meta_policy(
-        pairwise_returns: Dict[str, Dict[str, float]]
-    ) -> Dict[str, Dict[str, float]]:
+        pairwise_returns: dict[str, dict[str, float]]
+    ) -> dict[str, dict[str, float]]:
         """Get greedy meta-policy from pairwise returns.
 
         `pairwise_returns` is a dictionary mapping from ego agent policy ID to a
@@ -520,8 +519,8 @@ class POTMMCPMetaPolicy(SearchPolicy):
 
     @staticmethod
     def get_softmax_meta_policy(
-        pairwise_returns: Dict[str, Dict[str, float]], temperature: float
-    ) -> Dict[str, Dict[str, float]]:
+        pairwise_returns: dict[str, dict[str, float]], temperature: float
+    ) -> dict[str, dict[str, float]]:
         """Get softmax meta-policy from pairwise returns.
 
         `pairwise_returns` is a dictionary mapping from ego agent policy ID to a

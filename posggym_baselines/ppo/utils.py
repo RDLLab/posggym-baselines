@@ -1,17 +1,18 @@
 """Utility functions for PPO."""
-from typing import TYPE_CHECKING, Dict, List, Tuple
+from typing import TYPE_CHECKING
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
+
 
 if TYPE_CHECKING:
     from posggym_baselines.ppo.config import PPOConfig
 
 
 def split_batch_by_policy(
-    batch: Dict[str, torch.tensor], config: "PPOConfig"
-) -> Dict[str, Dict[str, torch.tensor]]:
+    batch: dict[str, torch.Tensor], config: "PPOConfig"
+) -> dict[str, dict[str, torch.Tensor]]:
     """Split a batch into batches for each policy.
 
     L = seq_len (max length for each individual sequence)
@@ -41,7 +42,7 @@ def split_batch_by_policy(
         # create tensor of partner policy ids for each sequence
         # partner idxs to have extra dimension, shape=(L, B, N, N-1)
         partner_policy_idxs = torch.zeros(
-            batch["policy_idxs"].shape + (config.num_agents - 1,)
+            (*batch["policy_idxs"].shape, config.num_agents - 1)
         ).long()
         for i in range(config.num_agents):
             partner_policy_idxs[:, :, i] = torch.index_select(
@@ -72,8 +73,8 @@ def split_batch_by_policy(
 
 
 def filter_batch_by_partner(
-    batch: Dict[str, torch.tensor], exclude_policy_ids: List[str], config: "PPOConfig"
-) -> Dict[str, torch.tensor]:
+    batch: dict[str, torch.Tensor], exclude_policy_ids: list[str], config: "PPOConfig"
+) -> dict[str, torch.Tensor]:
     """Filter policy batch to exclude experience against certain partners.
 
     Arguments
@@ -98,13 +99,8 @@ def filter_batch_by_partner(
     if config.num_agents == 1:
         return batch
     assert "partner_policy_idxs" in batch
-    # keep_idxs = torch.ones_like(batch["policy_idxs"])
-    # for policy_id in exclude_policy_ids:
-    #     policy_idx = config.get_policy_idx(policy_id)
-    #     keep_idxs[batch["partner_policy_idxs"] == policy_idx] = 0
-    # b_idxs = keep_idxs[0] > 0
 
-    exclude_policy_idxs = torch.tensor(
+    exclude_policy_idxs = torch.Tensor(
         [config.get_policy_idx(policy_id) for policy_id in exclude_policy_ids]
     )
     # keep sequences where ALL of the partner policy idxs are NOT IN the exclude list
@@ -129,8 +125,8 @@ def filter_batch_by_partner(
 
 
 def filter_policy_batches_by_partner_dist(
-    policy_batches: Dict[str, Dict[str, torch.tensor]], config: "PPOConfig"
-) -> Dict[str, Dict[str, torch.tensor]]:
+    policy_batches: dict[str, dict[str, torch.Tensor]], config: "PPOConfig"
+) -> dict[str, dict[str, torch.Tensor]]:
     """Filter policy batches to exclude experience against certain partners.
 
     Filtering is done according to the partner distribution for each policy given
@@ -167,8 +163,8 @@ def filter_policy_batches_by_partner_dist(
 
 
 def combine_batches(
-    batches: List[Dict[str, torch.tensor]], config: "PPOConfig"
-) -> Dict[str, Dict[str, torch.tensor]]:
+    batches: list[dict[str, torch.Tensor]], config: "PPOConfig"
+) -> dict[str, dict[str, torch.Tensor]]:
     """Combine multiple batches into a single batch.
 
     L = seq_len (max length for each individual sequence)
@@ -205,7 +201,7 @@ def combine_batches(
             policy_stat_keys = set()
             for b in batches:
                 policy_stat_policy_ids.update(b[k].keys())
-                for policy_id, policy_stats in b[k].items():
+                for _, policy_stats in b[k].items():
                     policy_stat_keys.update(policy_stats.keys())
 
             combined_batch[k] = {}
@@ -219,7 +215,7 @@ def combine_batches(
                     ]
                     if len(values) == 0:
                         continue
-                    values = torch.tensor(values)
+                    values = torch.Tensor(values)
                     if "mean_" in stat_name:
                         policy_stats[stat_name] = torch.mean(values)
                     elif "min_" in stat_name:
@@ -238,8 +234,8 @@ def combine_batches(
 
 
 def get_seq_idxs(
-    dones_buf: torch.tensor, max_seq_len: int
-) -> Tuple[List[List[torch.tensor]], List[List[torch.tensor]]]:
+    dones_buf: torch.Tensor, max_seq_len: int
+) -> tuple[list[list[torch.Tensor]], list[list[torch.Tensor]]]:
     """Get sequence chunk indices for each batch dim.
 
     The sequence chunks are used to split the batch into sequences of length
@@ -284,7 +280,7 @@ def get_seq_idxs(
         for i in range(len(env_seq_idxs)):
             next_idx = env_seq_idxs[i][-1] + 1
             overapping_env_seq_idxs.append(
-                torch.cat((env_seq_idxs[i], torch.tensor([next_idx]).long()))
+                torch.cat((env_seq_idxs[i], torch.Tensor([next_idx]).long()))
             )
 
         seq_idxs.append(env_seq_idxs)
@@ -293,11 +289,11 @@ def get_seq_idxs(
 
 
 def split_and_pad_batch(
-    batch: torch.tensor,
-    seq_idxs: List[List[torch.tensor]],
+    batch: torch.Tensor,
+    seq_idxs: list[list[torch.Tensor]],
     max_seq_len: int,
     padding_value: float = 0.0,
-) -> torch.tensor:
+) -> torch.Tensor:
     """Split batch into sequences and pad to max_seq_len.
 
     The batch is first split into episodes, then each episode is split into sequences
@@ -345,9 +341,9 @@ def split_and_pad_batch(
 
 
 def split_lstm_state_batch(
-    lstm_state_batch: torch.tensor,
-    seq_idxs: List[List[torch.tensor]],
-) -> torch.tensor:
+    lstm_state_batch: torch.Tensor,
+    seq_idxs: list[list[torch.Tensor]],
+) -> torch.Tensor:
     """Split batch of LSTM states according to sequences.
 
     The batch is first split into episodes, then each episode is split into sequences

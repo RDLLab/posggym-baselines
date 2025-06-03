@@ -1,5 +1,4 @@
 """Functions for the posggym.agents.wrappers.AgentEnvWrapper."""
-from typing import Dict, List
 
 import posggym
 import posggym.agents as pga
@@ -13,11 +12,11 @@ class UniformOtherAgentFn:
     This is a callable class that can be pickled and passed to the workers.
     """
 
-    def __init__(self, agent_policy_ids: Dict[str, List[str]]):
+    def __init__(self, agent_policy_ids: dict[str, list[str]]):
         self.agent_policy_ids = agent_policy_ids
         self.policies = {i: {} for i in agent_policy_ids}
 
-    def __call__(self, model: posggym.POSGModel) -> Dict[str, pga.Policy]:
+    def __call__(self, model: posggym.POSGModel) -> dict[str, pga.Policy]:
         other_agents = {}
         for agent_id in self.agent_policy_ids:
             pi_id = model.rng.choice(self.agent_policy_ids[agent_id])

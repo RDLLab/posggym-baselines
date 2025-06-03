@@ -1,5 +1,6 @@
 """Tests for planning.potmmcp.core."""
 
+import argparse
 import math
 
 import posggym
@@ -120,5 +121,16 @@ def test_with_pga_search_policy(render_mode="human", nesting_level=1):
 
 
 if __name__ == "__main__":
-    test_with_random_search_policy("human", nesting_level=1)
-    test_with_pga_search_policy("human", nesting_level=1)
+    parser = argparse.ArgumentParser(
+        description="Run INTMCP tests with specified render mode."
+    )
+    parser.add_argument(
+        "--render-mode",
+        type=str,
+        default=None,
+        choices=["human", "ansi", "rgb_array"],
+        help="Render mode to use for environment (default: None)",
+    )
+    args = parser.parse_args()
+    test_with_random_search_policy(args.render_mode, nesting_level=1)
+    test_with_pga_search_policy(args.render_mode, nesting_level=1)

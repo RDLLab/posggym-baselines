@@ -5,15 +5,14 @@ environment sampled from the population of policies at the start of each trainin
 episode.
 """
 import argparse
+from collections.abc import Callable
 from copy import deepcopy
 from pprint import pprint
-from typing import Callable, Optional
 
 import exp_utils
 import posggym
 from posggym.agents.wrappers import AgentEnvWrapper
 from posggym.wrappers import FlattenObservations, RecordVideo
-
 from posggym_baselines.ppo.br_ppo import BRPPOConfig
 from posggym_baselines.ppo.config import PPOConfig
 from posggym_baselines.ppo.core import run_ppo
@@ -25,7 +24,7 @@ def record_episode_trigger(ep):
 
 
 def get_env_creator_fn(
-    config: PPOConfig, env_idx: int, worker_idx: Optional[int] = None
+    config: PPOConfig, env_idx: int, worker_idx: int | None = None
 ) -> Callable:
     """Get function for creating the environment."""
 

@@ -3,14 +3,28 @@
 import contextlib
 from multiprocessing.queues import Empty
 
+import numpy as np
 import torch
 import torch.multiprocessing as mp
+from gymnasium import spaces
 
 import posggym_baselines.ppo.utils as ppo_utils
 from posggym_baselines.ppo.config import PPOConfig
 
 
-def run_rollout_worker(
+def one_hot(x: np.ndarray, space: spaces.Space) -> torch.Tensor:
+    if isinstance(space, spaces.MultiDiscrete):
+        return torch.cat(
+            [torch.nn.functional.one_hot(x[:, i], n) for i, n in enumerate(space.nvec)],
+            dim=-1,
+        )
+    elif isinstance(space, spaces.Discrete):
+        return torch.nn.functional.one_hot(x, space.n)
+    else:
+        return RuntimeError("Unspport Space")
+
+
+def run_rollout_worker(  # noqa: PLR0915, PLR0912
     worker_id: int,
     config: PPOConfig,
     recv_queue: mp.JoinableQueue,
@@ -54,13 +68,26 @@ def run_rollout_worker(
     # actor and critic setup
     policies = config.load_policies(device=device)
 
+    one_hot_size = (
+        config.act_space.n
+        if isinstance(config.act_space, spaces.Discrete)
+        else config.act_space.nvec.sum()
+    )
+
     # worker buffers
     buf_shape = (config.num_rollout_steps, config.num_envs, config.num_agents)
     policy_idx_buf = torch.zeros(buf_shape).long().to(device)
-    obs_buf = torch.zeros(buf_shape + config.obs_space.shape).to(device)
-    actions_buf = torch.zeros(
-        buf_shape + () if config.act_space.shape is None else config.act_space.shape
-    ).to(device)
+    obs_buf_shape = buf_shape + config.obs_space.shape
+
+    if config.use_previous_action:
+        obs_buf_shape = obs_buf_shape[:-1] + (obs_buf_shape[-1] + one_hot_size,)
+    obs_buf = torch.zeros(obs_buf_shape).to(device)
+
+    if len(config.act_space.shape or ()) == 0:
+        actions_buf = torch.zeros(buf_shape).long().to(device)
+    else:
+        actions_buf = torch.zeros(buf_shape + config.act_space.shape).to(device)
+
     logprobs_buf = torch.zeros(buf_shape).to(device)
     rewards_buf = torch.zeros(buf_shape).to(device)
     # +1 for bootstrapped value
@@ -73,8 +100,8 @@ def run_rollout_worker(
         config.lstm_size if config.use_lstm else 1,
     )
     lstm_states_buf = (
-        torch.zeros((config.num_rollout_steps,) + lstm_state_shape).to(device),
-        torch.zeros((config.num_rollout_steps,) + lstm_state_shape).to(device),
+        torch.zeros((config.num_rollout_steps, *lstm_state_shape)).to(device),
+        torch.zeros((config.num_rollout_steps, *lstm_state_shape)).to(device),
     )
 
     # setup variables for tracking current step outputs
@@ -89,7 +116,41 @@ def run_rollout_worker(
         torch.zeros(lstm_state_shape).to(config.worker_device),
         torch.zeros(lstm_state_shape).to(config.worker_device),
     )
-    next_action = torch.zeros(next_vars_shape).long().to(config.worker_device)
+    action_dim = (
+        1
+        if isinstance(config.act_space, spaces.Discrete)
+        else next(iter(envs.action_spaces.values())).shape[1]
+    )
+    next_action = (
+        torch.zeros((*next_vars_shape, action_dim)).long().to(config.worker_device)
+    )
+    if isinstance(config.act_space, spaces.Discrete):
+        next_action = next_action.squeeze(dim=-1)
+
+    if config.use_previous_action:
+        one_hot_size = int(
+            config.act_space.n
+            if isinstance(config.act_space, spaces.Discrete)
+            else config.act_space.nvec.sum()
+        )
+
+        initial_actions = (
+            torch.zeros(
+                (
+                    config.num_envs,
+                    config.num_agents,
+                    one_hot_size,
+                )
+            )
+            .long()
+            .to(config.worker_device)
+        )
+        initial_actions = initial_actions.reshape(
+            *next_obs.shape[:-1],
+            one_hot_size,
+        )
+        next_obs = torch.cat((next_obs, initial_actions), dim=-1)
+
     next_logprobs = torch.zeros(next_vars_shape).to(config.worker_device)
     next_values = torch.zeros(next_vars_shape).to(config.worker_device)
 
@@ -132,7 +193,7 @@ def run_rollout_worker(
         # collect batch of experience
         policy_episode_stats = {pi_id: [] for pi_id in config.get_all_policy_ids()}
         num_episodes = 0
-        for step in range(0, config.num_rollout_steps):
+        for step in range(config.num_rollout_steps):
             obs_buf[step] = next_obs
             policy_idx_buf[step] = sampled_policy_idxs
             dones_buf[step] = next_done
@@ -165,21 +226,38 @@ def run_rollout_worker(
                 if lstm_i is not None:
                     next_lstm_state[0][:, idxs, :] = lstm_i[0]
                     next_lstm_state[1][:, idxs, :] = lstm_i[1]
-
                 next_action[idxs] = actions_i
-
             actions_buf[step] = next_action
             logprobs_buf[step] = next_logprobs
             values_buf[step] = next_values
 
             # execute step.
-            next_obs, reward, terminated, truncated, dones, infos = envs.step(
-                next_action.reshape(-1).cpu().numpy()
+            _next_action = (
+                next_action.reshape(-1)
+                if isinstance(config.act_space, spaces.Discrete)
+                else next_action
             )
+            next_obs, reward, terminated, truncated, dones, infos = envs.step(
+                _next_action.cpu().numpy()
+            )
+            if config.use_previous_action:
+                next_obs = np.concatenate(
+                    (
+                        next_obs,
+                        one_hot(
+                            next_action.flatten(start_dim=0, end_dim=1),
+                            next(
+                                iter(envs.env.unwrapped.single_action_spaces.values())
+                            ),
+                        ).numpy(),
+                    ),
+                    axis=-1,
+                )
+
             agent_dones = terminated | truncated
 
             rewards_buf[step] = (
-                torch.tensor(reward)
+                torch.Tensor(reward)
                 .reshape((config.num_envs, config.num_agents))
                 .to(config.worker_device)
             )
@@ -203,7 +281,7 @@ def run_rollout_worker(
 
                     # get episode stats
                     for agent_id, policy_id in zip(
-                        envs.possible_agents, sampled_policies[env_idx]
+                        envs.possible_agents, sampled_policies[env_idx], strict=False
                     ):
                         if "episode" not in infos[agent_id]:
                             continue
@@ -273,7 +351,7 @@ def run_rollout_worker(
         )
         b_rewards = ppo_utils.split_and_pad_batch(rewards_buf, seq_idxs, config.seq_len)
         # +1 to include additional step at end of sequence which is used for calculating
-        # advantages and returns
+        # advantages and returns # noqa: ERA001
         # Also pad dones with 1.0, since this has the effect of zeroing out the
         # further steps in the sequence when calculating the advantages and returns
         b_dones = ppo_utils.split_and_pad_batch(

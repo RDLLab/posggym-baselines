@@ -1,5 +1,6 @@
 """Tests for planning.mcts.core."""
 
+import argparse
 import math
 
 import posggym
@@ -10,7 +11,7 @@ from posggym_baselines.planning.other_policy import RandomOtherAgentPolicy
 from posggym_baselines.planning.search_policy import RandomSearchPolicy
 
 
-def test_with_random_policies():
+def test_with_random_policies(render_mode: str = "human"):
     """Test POMMCP with random policies."""
     config = MCTSConfig(
         discount=0.95,
@@ -31,7 +32,7 @@ def test_with_random_policies():
         grid="14x14RoundAbout",
         num_agents=2,
         obs_dim=(3, 1, 1),
-        render_mode="human",
+        render_mode=render_mode,
     )
 
     planning_agent_id = env.possible_agents[0]
@@ -70,4 +71,15 @@ def test_with_random_policies():
 
 
 if __name__ == "__main__":
-    test_with_random_policies()
+    parser = argparse.ArgumentParser(
+        description="Run MCTS tests with specified render mode."
+    )
+    parser.add_argument(
+        "--render-mode",
+        type=str,
+        default=None,
+        choices=["human", "ansi", "rgb_array"],
+        help="Render mode to use for environment (default: None)",
+    )
+    args = parser.parse_args()
+    test_with_random_policies(args.render_mode)

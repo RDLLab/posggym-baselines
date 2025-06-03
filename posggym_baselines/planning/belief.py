@@ -1,5 +1,6 @@
 import random
-from typing import Callable, Dict, Generic, List, Optional, TypeVar
+from collections.abc import Callable
+from typing import Generic, TypeVar
 
 import posggym.model as M
 from posggym.agents.policy import PolicyState
@@ -29,7 +30,7 @@ class HistoryPolicyState:
         self,
         state: M.StateType,
         history: JointHistory,
-        policy_state: Dict[str, PolicyState],
+        policy_state: dict[str, PolicyState],
         t: int,
     ):
         self.state = state
@@ -47,7 +48,7 @@ class HistoryPolicyState:
 class ParticleBelief(Generic[ParticleType]):
     """A belief represented by state particles."""
 
-    def __init__(self, rng: Optional[random.Random] = None):
+    def __init__(self, rng: random.Random | None = None):
         self.rng = rng if rng is not None else random.Random()
         self.particles = []
 
@@ -152,7 +153,7 @@ class BeliefRejectionSampler:
         joint_action_fn: Callable,
         joint_update_fn: Callable,
         use_rejected_samples: bool,
-    ) -> List[HistoryPolicyState]:
+    ) -> list[HistoryPolicyState]:
         sample_count = 0
         num_attempts = 0
         rejected_samples = []

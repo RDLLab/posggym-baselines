@@ -1,10 +1,10 @@
 """Tests for planning.potmmcp.core."""
 
+import argparse
 import math
 
 import posggym
 import posggym.agents as pga
-
 from posggym_baselines.planning import (
     POMCP,
     MCTSConfig,
@@ -118,5 +118,17 @@ def test_with_pga_search_policy(render_mode="human"):
 
 
 if __name__ == "__main__":
-    test_with_random_search_policy("human")
-    test_with_pga_search_policy("human")
+    parser = argparse.ArgumentParser(
+        description="Run POMCP tests with specified render mode."
+    )
+    parser.add_argument(
+        "--render-mode",
+        type=str,
+        default=None,
+        choices=["human", "ansi", "rgb_array"],
+        help="Render mode to use for environment (default: None)",
+    )
+    args = parser.parse_args()
+
+    test_with_random_search_policy(args.render_mode)
+    test_with_pga_search_policy(args.render_mode)

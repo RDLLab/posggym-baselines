@@ -1,5 +1,4 @@
 import abc
-from typing import Dict, Optional
 
 import numpy as np
 import posggym.model as M
@@ -35,7 +34,7 @@ class SearchPolicy(abc.ABC):
     @abc.abstractmethod
     def get_next_state(
         self,
-        action: Optional[M.ActType],
+        action: M.ActType | None,
         obs: M.ObsType,
         state: PolicyState,
     ) -> PolicyState:
@@ -82,7 +81,7 @@ class SearchPolicy(abc.ABC):
         """
 
     @abc.abstractmethod
-    def get_pi(self, state: PolicyState) -> Dict[M.ActType, float]:
+    def get_pi(self, state: PolicyState) -> dict[M.ActType, float]:
         """Get policy's distribution over actions for given policy state.
 
         Subclasses must implement this method
@@ -152,7 +151,7 @@ class SearchPolicy(abc.ABC):
 
         Should be overridden in subclasses as necessary.
         """
-        pass
+        return
 
 
 class RandomSearchPolicy(SearchPolicy):
@@ -167,7 +166,7 @@ class RandomSearchPolicy(SearchPolicy):
 
     def get_next_state(
         self,
-        action: Optional[M.ActType],
+        action: M.ActType | None,
         obs: M.ObsType,
         state: PolicyState,
     ) -> PolicyState:
@@ -176,7 +175,7 @@ class RandomSearchPolicy(SearchPolicy):
     def sample_action(self, state: PolicyState) -> M.ActType:
         return self._action_space.sample()
 
-    def get_pi(self, state: PolicyState) -> Dict[M.ActType, float]:
+    def get_pi(self, state: PolicyState) -> dict[M.ActType, float]:
         return {a: 1.0 / self._action_space.n for a in range(self._action_space.n)}
 
     def get_value(self, state: PolicyState) -> float:
@@ -198,7 +197,7 @@ class SearchPolicyWrapper(SearchPolicy):
 
     def get_next_state(
         self,
-        action: Optional[M.ActType],
+        action: M.ActType | None,
         obs: M.ObsType,
         state: PolicyState,
     ) -> PolicyState:
@@ -207,7 +206,7 @@ class SearchPolicyWrapper(SearchPolicy):
     def sample_action(self, state: PolicyState) -> M.ActType:
         return self.policy.sample_action(state)
 
-    def get_pi(self, state: PolicyState) -> Dict[M.ActType, float]:
+    def get_pi(self, state: PolicyState) -> dict[M.ActType, float]:
         pi = self.policy.get_pi(state).probs
 
         if len(pi) != len(self.action_space):
@@ -253,17 +252,17 @@ class PPOLSTMSearchPolicy(SearchPolicy):
 
     def get_next_state(
         self,
-        action: Optional[M.ActType],
+        action: M.ActType | None,
         obs: M.ObsType,
         state: PolicyState,
     ) -> PolicyState:
         obs = self.obs_processor(obs)
         if isinstance(obs, np.ndarray):
-            obs = torch.tensor(obs, dtype=torch.float32)
+            obs = torch.Tensor(obs, dtype=torch.float32)
 
         with torch.no_grad():
             hidden_state, lstm_state = self.policy_model.get_states(
-                obs, state["lstm_state"], done=torch.tensor([0])
+                obs, state["lstm_state"], done=torch.Tensor([0])
             )
             logits = self.policy_model.actor(hidden_state)
             probs = Categorical(logits=logits).probs.squeeze()
@@ -278,7 +277,7 @@ class PPOLSTMSearchPolicy(SearchPolicy):
     def sample_action(self, state: PolicyState) -> M.ActType:
         return state["pi"].sample()
 
-    def get_pi(self, state: PolicyState) -> Dict[M.ActType, float]:
+    def get_pi(self, state: PolicyState) -> dict[M.ActType, float]:
         return state["pi"].probs
 
     def get_value(self, state: PolicyState) -> float:
